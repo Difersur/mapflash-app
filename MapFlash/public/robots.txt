@@ -1,0 +1,7 @@
+# MapFlash - robots.txt
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+
+Sitemap: https://mapflash.app/sitemap.xml

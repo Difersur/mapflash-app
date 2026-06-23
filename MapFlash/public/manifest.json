@@ -1,0 +1,21 @@
+{
+  "name": "MapFlash",
+  "short_name": "MapFlash",
+  "description": "Plataforma de rutas y servicios del Peru",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1f35",
+  "theme_color": "#1a8fe3",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["navigation", "transportation", "utilities"],
+  "lang": "es-PE",
+  "dir": "ltr"
+}
