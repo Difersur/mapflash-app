@@ -48,11 +48,11 @@ export default function Mapa() {
 
   const querySegura = encodeURIComponent(lugarActual);
   
-  // URL CORREGIDA: Formato limpio usando backticks y la interpolación oficial de Next.js
   const googleMapsUrl = apiKey 
-    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${querySegura}&zoom=14`
+    ? coord 
+      ? `https://www.google.com/maps/embed/v1/directions?key=${apiKey}&origin=${coord.lat},${coord.lng}&destination=${querySegura}&zoom=14`
+      : `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${querySegura}&zoom=14`
     : '';
-
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
