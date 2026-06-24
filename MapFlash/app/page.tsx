@@ -1,7 +1,13 @@
 'use client';
-// Pagina principal MapFlash — login + registro 4 roles
+// Pagina principal MapFlash — login + registro 4 roles conectado a Supabase
 import { useState } from 'react';
 import Link from 'next/link';
+import { createClient } from '@supabase/supabase-js';
+
+// Inicializamos el cliente de Supabase usando tus variables de entorno de Vercel
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const ROLES = [
   { id: 'usuario',   emoji: '🧭', nombre: 'Usuario',   desc: 'Busco rutas y pido servicios' },
@@ -13,6 +19,51 @@ const ROLES = [
 export default function Home() {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [rol, setRol]   = useState('');
+  
+  // Estados para capturar los datos del formulario de registro
+  const [nombre, setNombre] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [cargando, setCargando] = useState(false);
+
+  // Función para manejar el registro e insertar los datos en Supabase
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rol) return alert("Por favor, selecciona un rol primero.");
+    if (!nombre || !whatsapp || !email || !password) return alert("Por favor, completa todos los campos.");
+
+    setCargando(true);
+
+    try {
+      // Insertamos el nuevo usuario en tu tabla pública de Supabase
+      const { error } = await supabase
+        .from('usuarios')
+        .insert([
+          {
+            nombre,
+            whatsapp,
+            email,
+            password, // Nota: En entornos de producción real se recomienda encriptar
+            rol,
+            comunidad: 'Ninguna'
+          }
+        ]);
+
+      if (error) throw error;
+
+      // Alerta visual confirmando el éxito de la operación
+      alert("🎉 ¡Tu cuenta fue creada con éxito! Bienvenido a MapFlash.");
+      
+      // Redireccionamos de manera automática al mapa principal
+      window.location.href = '/mapa';
+
+    } catch (error: any) {
+      alert("Error al registrar tu cuenta: " + error.message);
+    } finally {
+      setCargando(false);
+    }
+  };
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen font-sans">
@@ -100,12 +151,12 @@ export default function Home() {
               </button>
             </div>
           ) : (
-            <div>
+            <form onSubmit={handleRegister}>
               <h3 className="text-xl font-bold text-slate-900 mb-1">Crear cuenta en MapFlash</h3>
               <p className="text-sm text-slate-500 mb-4">¿Como quieres usar la plataforma?</p>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {ROLES.map(r=>(
-                  <button key={r.id} onClick={()=>setRol(r.id)}
+                  <button type="button" key={r.id} onClick={()=>setRol(r.id)}
                     className={`text-left rounded-xl border p-3 transition ${rol===r.id?'border-2 border-blue-500 bg-blue-50':'border-gray-200 hover:border-blue-300'}`}>
                     <div className="text-xl mb-1">{r.emoji}</div>
                     <div className="text-xs font-semibold text-gray-900">{r.nombre}</div>
@@ -113,19 +164,20 @@ export default function Home() {
                   </button>
                 ))}
               </div>
-              <input type="text" placeholder="Nombre completo"
+              <input type="text" placeholder="Nombre completo" required value={nombre} onChange={e=>setNombre(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-500 mb-2"/>
-              <input type="text" placeholder="WhatsApp (987 654 321)"
+              <input type="text" placeholder="WhatsApp (987 654 321)" required value={whatsapp} onChange={e=>setWhatsapp(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-500 mb-2"/>
-              <input type="email" placeholder="Correo electronico"
+              <input type="email" placeholder="Correo electronico" required value={email} onChange={e=>setEmail(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-500 mb-2"/>
-              <input type="password" placeholder="Contrasena (min. 8 caracteres)"
+              <input type="password" placeholder="Contrasena (min. 8 caracteres)" required value={password} onChange={e=>setPassword(e.target.value)}
                 className="w-full border border-slate-200 rounded-lg p-3 text-sm focus:outline-none focus:border-blue-500 mb-4"/>
-              <Link href="/mapa"
-                className={`w-full p-3 rounded-lg text-center font-semibold text-sm block transition ${rol?'bg-blue-600 text-white hover:bg-blue-700':'bg-gray-200 text-gray-400 pointer-events-none'}`}>
-                Crear mi cuenta →
-              </Link>
-            </div>
+              
+              <button type="submit" disabled={cargando || !rol}
+                className={`w-full p-3 rounded-lg text-center font-semibold text-sm block transition ${rol && !cargando ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                {cargando ? 'Creando tu cuenta...' : 'Crear mi cuenta →'}
+              </button>
+            </form>
           )}
         </div>
       </div>
