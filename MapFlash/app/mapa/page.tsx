@@ -1,6 +1,6 @@
 'use client';
-// Mapa interactivo dinámico nacional usando Google Maps Embed API
-import { useState } from 'react';
+// Mapa interactivo dinámico nacional usando Google Maps Embed API con Perfil
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const REPORTES = [
@@ -10,12 +10,43 @@ const REPORTES = [
   {id:'cierre',    emoji:'🚧', label:'Via cerrada'},
 ];
 
+// Mapeo de emojis según el rol del usuario
+const EMOJIS_ROLES: { [key: string]: string } = {
+  usuario: '🧭',
+  conductor: '🚗',
+  mapeador: '🗺️',
+  empresa: '🏢',
+  admin: '👑'
+};
+
 export default function Mapa() {
   const [gps,  setGps]   = useState('GPS inactivo — toca 📍');
   const [coord,setCoord] = useState<{lat:number;lng:number}|null>(null);
   const [dest, setDest]  = useState('');
   const [lugarActual, setLugarActual] = useState('Peru');
   const [reportes, setReportes] = useState<{tipo:string;emoji:string;tiempo:string}[]>([]);
+  
+  // Estado para almacenar el usuario que inició sesión
+  const [usuario, setUsuario] = useState<{ nombre: string; email: string; rol: string } | null>(null);
+
+  // Efecto para leer la sesión guardada del localStorage al cargar la página
+  useEffect(() => {
+    const sesionGuardada = localStorage.getItem('usuario_mapflash');
+    if (sesionGuardada) {
+      try {
+        setUsuario(JSON.parse(sesionGuardada));
+      } catch (e) {
+        console.error("Error al leer la sesión", e);
+      }
+    }
+  }, []);
+
+  // Función para cerrar sesión limpiamente
+  const cerrarSesion = () => {
+    localStorage.removeItem('usuario_mapflash');
+    setUsuario(null);
+    window.location.href = '/';
+  };
 
   // 100% CORREGIDO: Lee de forma exacta la variable de Vercel
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -53,14 +84,54 @@ export default function Mapa() {
       ? `https://www.google.com/maps/embed/v1/directions?key=${apiKey}&origin=${coord.lat},${coord.lng}&destination=${querySegura}&zoom=14`
       : `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${querySegura}&zoom=14`
     : '';
+
+  // Obtener la inicial del nombre para el avatar por defecto
+  const inicialNombre = usuario?.nombre ? usuario.nombre.charAt(0).toUpperCase() : '?';
+  const emojiRol = usuario?.rol ? EMOJIS_ROLES[usuario.rol] || '👤' : '👤';
+
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <Link href="/" className="text-sm font-medium text-gray-700">
-          ← Map<span className="text-blue-500">Flash</span>
-        </Link>
-        <span className="flex-1 text-sm font-medium text-gray-900">Mapa Nacional del Perú</span>
-        <Link href="/entrega" className="text-xs text-blue-500">📦 Entrega</Link>
+      {/* HEADER PRINCIPAL */}
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between gap-3 shadow-sm">
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-sm font-medium text-gray-700 hover:text-blue-600 transition">
+            ← Map<span className="text-blue-500">Flash</span>
+          </Link>
+          <span className="text-sm font-bold text-gray-900 border-l border-gray-200 pl-3">
+            Mapa Nacional del Perú
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <Link href="/entrega" className="text-xs text-blue-500 font-medium hover:underline">
+            📦 Entrega
+          </Link>
+
+          {/* RECUADRO DE PERFIL INTEGRADO DENTRO DEL HEADER */}
+          {usuario ? (
+            <div className="flex items-center gap-2 bg-slate-50 border border-gray-200 rounded-xl p-1.5 pr-3 shadow-sm">
+              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center text-sm font-bold shadow-inner relative">
+                {inicialNombre}
+                <span className="absolute -bottom-1 -right-1 text-xs">{emojiRol}</span>
+              </div>
+              <div className="flex flex-col max-w-[120px]">
+                <span className="text-xs font-semibold text-gray-800 truncate">{usuario.nombre}</span>
+                <span className="text-[10px] text-gray-400 font-medium capitalize">{usuario.rol}</span>
+              </div>
+              <button 
+                onClick={cerrarSesion}
+                title="Cerrar sesión"
+                className="ml-1 text-gray-400 hover:text-red-500 transition p-1 rounded-md hover:bg-red-50"
+              >
+                ➔
+              </button>
+            </div>
+          ) : (
+            <Link href="/" className="text-xs bg-blue-600 text-white font-semibold px-3 py-1.5 rounded-lg hover:bg-blue-700 transition">
+              Iniciar Sesión
+            </Link>
+          )}
+        </div>
       </header>
 
       {/* Controladores del Mapa */}
