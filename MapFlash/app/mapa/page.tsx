@@ -49,9 +49,9 @@ export default function Mapa() {
   // Codificamos el texto para la URL de Google
   const querySegura = encodeURIComponent(lugarActual);
   
-  // URL Oficial usando Google Maps Embed API (Modo 'place' o 'search')
+  // URL CORREGIDA: Sin llaves intermedias ni números colados, limpia para Next.js
   const googleMapsUrl = apiKey 
-    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${querySegura}&zoom=14`
+    ? `https://www.google.com/maps/embed/v1/search?key=${apiKey}&q=${querySegura}&zoom=14`
     : '';
 
   return (
