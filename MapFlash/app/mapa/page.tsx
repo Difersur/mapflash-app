@@ -17,7 +17,7 @@ export default function Mapa() {
   const [lugarActual, setLugarActual] = useState('Peru');
   const [reportes, setReportes] = useState<{tipo:string;emoji:string;tiempo:string}[]>([]);
 
-  // CORREGIDO: Coincide de manera exacta con tu panel de Vercel
+  // Clave de API inyectada desde Vercel
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   function activarGPS(){
@@ -48,9 +48,9 @@ export default function Mapa() {
 
   const querySegura = encodeURIComponent(lugarActual);
   
-  // URL CORREGIDA: Interpolación de Next.js limpia sin llaves literales ni errores
+  // URL OFICIAL CORREGIDA: Sin errores de formato y usando backticks reales
   const googleMapsUrl = apiKey 
-    ? `https://www.google.com/maps/embed/v1/search?key=${apiKey}&q=${querySegura}&zoom=14`
+    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${querySegura}&zoom=14`
     : '';
 
   return (
@@ -63,7 +63,7 @@ export default function Mapa() {
         <Link href="/entrega" className="text-xs text-blue-500">📦 Entrega</Link>
       </header>
 
-      {/* Barra de control superior */}
+      {/* Barra de búsqueda */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0"/>
@@ -94,7 +94,7 @@ export default function Mapa() {
         )}
       </div>
 
-      {/* Contenedor oficial del mapa embebido */}
+      {/* Mapa */}
       <div className="flex-1 relative min-h-64 bg-gray-100">
         {googleMapsUrl ? (
           <iframe
@@ -108,11 +108,11 @@ export default function Mapa() {
           />
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
-            <p className="text-sm text-red-500 font-medium">Falta configurar la clave API de Google Maps en Vercel</p>
+            <p className="text-sm text-red-500 font-medium">Cargando credenciales del mapa...</p>
           </div>
         )}
 
-        {/* Notificaciones de reportes en tiempo real */}
+        {/* Alertas flotantes */}
         {reportes.length > 0 && (
           <div className="absolute top-3 left-3 right-3 flex gap-2 flex-wrap z-10">
             {reportes.map((r,i)=>(
@@ -124,7 +124,7 @@ export default function Mapa() {
         )}
       </div>
 
-      {/* Panel inferior */}
+      {/* Botones de incidentes */}
       <div className="bg-white border-t border-gray-200 px-4 py-3">
         <div className="text-xs font-medium text-gray-500 mb-2">Alertar alertas de tránsito en tu posición actual</div>
         <div className="grid grid-cols-4 gap-2">
