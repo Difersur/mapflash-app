@@ -156,7 +156,7 @@ export default function Home() {
         <div className="w-full max-w-sm">
           {/* Tabs */}
           <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
-            {['login', 'register'] as const).map(t => (
+            (['login', 'register'] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`flex-1 py-2 text-sm rounded-lg transition ${tab === t ? 'bg-white shadow font-semibold text-gray-900' : 'text-gray-500'}`}>
                 {t === 'login' ? 'Ingresar' : 'Registrarse'}
