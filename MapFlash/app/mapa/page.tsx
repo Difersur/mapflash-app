@@ -1,5 +1,5 @@
 'use client';
-// Mapa interactivo global para todo el Perú usando Google Maps
+// Mapa interactivo global para todo el Perú usando Google Maps Embed API
 import { useState } from 'react';
 import Link from 'next/link';
 
@@ -27,7 +27,7 @@ export default function Mapa() {
       p=>{ 
         setCoord({lat:p.coords.latitude,lng:p.coords.longitude});
         setGps(`GPS activo · ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`);
-        setLugarActual(`${p.coords.latitude.toFixed(4)},${p.coords.longitude.toFixed(4)}`);
+        setLugarActual(`${p.coords.latitude},${p.coords.longitude}`);
       },
       ()=>{ setGps('No se pudo obtener ubicación — revisa los permisos'); },
       {enableHighAccuracy:true,timeout:8000}
@@ -37,7 +37,6 @@ export default function Mapa() {
   function ejecutarBusqueda(e: React.FormEvent) {
     e.preventDefault();
     if (dest.trim().length > 0) {
-      // Al buscar, actualizamos el lugar para reenfocar el mapa en Google
       setLugarActual(dest);
     }
   }
@@ -47,11 +46,13 @@ export default function Mapa() {
     alert(`✅ Reporte "${tipo}" enviado en esta zona. +20 MapCoins acreditados.`);
   }
 
-  // Convertimos el texto de búsqueda en un formato seguro para URLs de Google
+  // Codificamos el texto para la URL de Google
   const querySegura = encodeURIComponent(lugarActual);
   
-  // URL de Google Maps en Modo Search (Busca y reacciona a CUALQUIER lugar del Perú o coordenadas GPS)
-  const googleMapsUrl = `https://www.google.com/maps/embed/v1/view?key=${apiKey}&q=${querySegura}`;
+  // URL Oficial usando Google Maps Embed API (Modo 'place' o 'search')
+  const googleMapsUrl = apiKey 
+    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${querySegura}&zoom=14`
+    : '';
 
   return (
     <main className="min-h-screen bg-gray-50 flex flex-col">
@@ -79,7 +80,7 @@ export default function Mapa() {
           <input 
             value={dest} 
             onChange={e=>setDest(e.target.value)}
-            placeholder="Busca cualquier lugar (Ej: Miraflores, Jauja, Cusco, Arequipa...)"
+            placeholder="Busca cualquier lugar (Ej: Miraflores, Huancayo, Cusco...)"
             className="flex-1 h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button type="submit" className="h-9 px-4 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600">
@@ -94,11 +95,11 @@ export default function Mapa() {
         )}
       </div>
 
-      {/* Área del MAPA DINÁMICO */}
-      <div className="flex-1 relative min-h-64 bg-blue-50">
-        {apiKey ? (
+      {/* Área del MAPA REAL */}
+      <div className="flex-1 relative min-h-64 bg-gray-100">
+        {googleMapsUrl ? (
           <iframe
-            title="Google Map Peru"
+            title="Google Map Real"
             width="100%"
             height="100%"
             className="absolute inset-0 border-0 w-full h-full"
@@ -107,8 +108,8 @@ export default function Mapa() {
             src={googleMapsUrl}
           />
         ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6">
-            <p className="text-sm text-red-500">Falta configurar la clave API de Google Maps</p>
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+            <p className="text-sm text-red-500 font-medium">Falta configurar la clave API de Google Maps en Vercel</p>
           </div>
         )}
 
