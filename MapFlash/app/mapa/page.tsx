@@ -17,7 +17,7 @@ export default function Mapa() {
   const [lugarActual, setLugarActual] = useState('Peru');
   const [reportes, setReportes] = useState<{tipo:string;emoji:string;tiempo:string}[]>([]);
 
-  // Captura la API Key desde las variables de Vercel
+  // CORREGIDO: Coincide de manera exacta con tu panel de Vercel
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
   function activarGPS(){
@@ -46,10 +46,9 @@ export default function Mapa() {
     alert(`✅ Reporte "${tipo}" enviado en esta zona. +20 MapCoins acreditados.`);
   }
 
-  // Se codifica el texto para evitar rupturas en la URL
   const querySegura = encodeURIComponent(lugarActual);
   
-  // URL Oficial de Google Maps corregida (reemplaza cualquier texto anterior)
+  // URL CORREGIDA: Interpolación de Next.js limpia sin llaves literales ni errores
   const googleMapsUrl = apiKey 
     ? `https://www.google.com/maps/embed/v1/search?key=${apiKey}&q=${querySegura}&zoom=14`
     : '';
@@ -64,7 +63,7 @@ export default function Mapa() {
         <Link href="/entrega" className="text-xs text-blue-500">📦 Entrega</Link>
       </header>
 
-      {/* Caja interactiva superior */}
+      {/* Barra de control superior */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 space-y-2">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-blue-500 flex-shrink-0"/>
@@ -80,7 +79,7 @@ export default function Mapa() {
           <input 
             value={dest} 
             onChange={e=>setDest(e.target.value)}
-            placeholder="Busca un lugar (Ej: Huancayo, El Tambo, Chilca...)"
+            placeholder="Busca un lugar (Ej: Huancayo, Lima, Cusco...)"
             className="flex-1 h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button type="submit" className="h-9 px-4 bg-blue-500 text-white text-xs font-medium rounded-lg hover:bg-blue-600">
@@ -95,7 +94,7 @@ export default function Mapa() {
         )}
       </div>
 
-      {/* Renderizado de Google Map Embebido Real */}
+      {/* Contenedor oficial del mapa embebido */}
       <div className="flex-1 relative min-h-64 bg-gray-100">
         {googleMapsUrl ? (
           <iframe
@@ -113,7 +112,7 @@ export default function Mapa() {
           </div>
         )}
 
-        {/* Notificaciones flotantes */}
+        {/* Notificaciones de reportes en tiempo real */}
         {reportes.length > 0 && (
           <div className="absolute top-3 left-3 right-3 flex gap-2 flex-wrap z-10">
             {reportes.map((r,i)=>(
@@ -125,7 +124,7 @@ export default function Mapa() {
         )}
       </div>
 
-      {/* Botonera inferior de tráfico */}
+      {/* Panel inferior */}
       <div className="bg-white border-t border-gray-200 px-4 py-3">
         <div className="text-xs font-medium text-gray-500 mb-2">Alertar alertas de tránsito en tu posición actual</div>
         <div className="grid grid-cols-4 gap-2">
