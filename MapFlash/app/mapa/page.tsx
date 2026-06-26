@@ -116,14 +116,20 @@ export default function MapaPage() {
           <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
             🔥 {reportes.length} Alertas activas
           </span>
+          
+          {/* NOMBRE DE USUARIO CON ENLACE DIRECTO AL PERFIL */}
           {usuario ? (
             <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
-              <span className="text-xs font-semibold text-slate-200">
+              <Link 
+                href="/perfil" 
+                className="text-xs font-semibold text-slate-200 hover:text-blue-400 transition flex items-center gap-1"
+                title="Ver mi Perfil"
+              >
                 {getEmojiRol(usuario.rol)} {usuario.nombre}
-              </span>
+              </Link>
               <button 
                 onClick={handleCerrarSesion}
-                className="text-slate-400 hover:text-rose-400 transition ml-1"
+                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs"
                 title="Cerrar Sesión"
               >
                 ✕
@@ -143,7 +149,7 @@ export default function MapaPage() {
           
           {/* IFRAME OPTIMIZADO Y REPARADO PARA EVITAR PANTALLA NEGRA */}
           <iframe
-            src="https://maps.google.com/maps?q=Peru&t=&z=6&ie=UTF8&iwloc=&output=embed"
+            src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d3901.865664593466!2d-77.042793!3d-12.046374!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses-419!2spe!4v1700000000000!5m2!1ses-419!2spe"
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen={true}
             loading="lazy"
