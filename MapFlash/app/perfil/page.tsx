@@ -8,6 +8,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Usuario {
+  id?: string; // Agregamos ID por si lo usas como llave primaria
   nombre: string;
   email: string;
   rol: string;
@@ -20,7 +21,6 @@ export default function PerfilPage() {
   const [vistaPrevia, setVistaPrevia] = useState<string>('');
   const [guardando, setGuardando] = useState(false);
 
-  // Estados para el control de la cámara web
   const [camaraActiva, setCamaraActiva] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -40,7 +40,6 @@ export default function PerfilPage() {
     };
   }, []);
 
-  // Encender la cámara web o del celular
   const encenderCamara = async () => {
     setArchivo(null);
     try {
@@ -57,7 +56,7 @@ export default function PerfilPage() {
         }
       }, 100);
     } catch (err) {
-      alert("No se pudo acceder a la cámara. Asegúrate de otorgar los permisos en el navegador.");
+      alert("No se pudo acceder a la cámara. Asegúrate de otorgar los permisos.");
     }
   };
 
@@ -69,7 +68,6 @@ export default function PerfilPage() {
     setCamaraActiva(false);
   };
 
-  // Capturar la foto instantánea desde el video
   const capturarFoto = () => {
     if (!videoRef.current) return;
 
@@ -115,26 +113,37 @@ export default function PerfilPage() {
     try {
       const nombreArchivo = `${usuario.email}-${Date.now()}.jpg`;
 
+      // 1. Subir la imagen física al Storage de Supabase
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(nombreArchivo, archivo, { cacheControl: '3600', upsert: true });
 
       if (uploadError) throw uploadError;
 
+      // 2. Obtener la URL pública de la foto recién subida
       const { data: urlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(nombreArchivo);
 
       const urlPublicaFoto = urlData.publicUrl;
 
+      // 3. NUEVO: Guardar la URL de la foto en la tabla de la base de datos vinculada al correo
+      const { error: dbError } = await supabase
+        .from('usuarios')
+        .update({ avatar_url: urlPublicaFoto })
+        .eq('email', usuario.email);
+
+      if (dbError) throw dbError;
+
+      // 4. Actualizar el estado y almacenamiento local
       const usuarioActualizado = { ...usuario, avatar_url: urlPublicaFoto };
       localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
       setUsuario(usuarioActualizado);
 
-      alert("¡Tu foto de perfil se ha guardado con éxito! 📸🚀");
+      alert("¡Tu foto de perfil se ha guardado en la nube con éxito! 📸🚀");
     } catch (error: any) {
       console.error(error);
-      alert("Error al guardar la imagen: " + error.message);
+      alert("Error al guardar en la base de datos: " + error.message);
     } finally {
       setGuardando(false);
     }
@@ -151,25 +160,22 @@ export default function PerfilPage() {
     );
   }
 
-  // Normalizamos el rol pasándolo a minúsculas para evitar problemas de cruces
   const rolNormalizado = usuario.rol ? usuario.rol.toLowerCase() : '';
 
   return (
     <div className="min-h-screen bg-slate-100 font-sans flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
         
-        {/* Cabecera */}
         <div className="bg-slate-950 text-white p-6 flex justify-between items-center">
           <div>
             <h1 className="text-lg font-bold">Mi Perfil</h1>
-            <p className="text-[11px] text-slate-400">MapFlash ID verificado</p>
+            <p className="text-[11px] text-slate-400">MapFlash ID verificado Nube</p>
           </div>
           <Link href="/mapa" className="text-[11px] bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition">
             ← Volver al Mapa
           </Link>
         </div>
 
-        {/* Contenido */}
         <div className="p-6 flex flex-col items-center">
           
           <div className="relative w-24 h-24 mb-4">
@@ -188,7 +194,6 @@ export default function PerfilPage() {
 
           <h2 className="text-base font-bold text-slate-800">{usuario.nombre}</h2>
           
-          {/* AQUÍ CORREGIMOS EL SINO DE MAYÚSCULAS: Soporta 'Entrega' y 'entrega' */}
           <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider mt-1 mb-6">
             {rolNormalizado === 'entrega' ? '📦 Conductor' : '👤 Usuario'}
           </span>
@@ -199,9 +204,8 @@ export default function PerfilPage() {
               <p className="text-sm text-slate-700 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">{usuario.email}</p>
             </div>
 
-            {/* SECCIÓN MULTIMEDIA COMPLETA */}
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Actualizar Fotografía</label>
+              <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Actualizar Fotografía Nube</label>
               
               {camaraActiva ? (
                 <div className="flex flex-col items-center gap-2 mb-3">
@@ -257,7 +261,7 @@ export default function PerfilPage() {
               disabled={guardando || !archivo}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs py-3 rounded-xl transition shadow-sm mt-2"
             >
-              {guardando ? 'Guardando en la nube...' : 'Confirmar Nueva Fotografía'}
+              {guardando ? 'Sincronizando Base de datos...' : 'Confirmar Nueva Fotografía'}
             </button>
           </div>
 
