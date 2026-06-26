@@ -19,6 +19,7 @@ const ROLES = [
 export default function Home() {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [rol, setRol]   = useState('');
+  const [showMenu, setShowMenu] = useState(false); // Controla el submenú de conductores
   
   // Estados para login convencional
   const [loginInput, setLoginInput] = useState('');
@@ -98,7 +99,7 @@ export default function Home() {
             nombre,
             whatsapp,
             email,
-            password, // Nota: En entornos de producción real se recomienda encriptar
+            password, 
             rol,
             comunidad: 'Ninguna'
           }
@@ -109,10 +110,7 @@ export default function Home() {
       // GUARDADO DE LA SESIÓN EN EL NAVEGADOR:
       localStorage.setItem('usuario_mapflash', JSON.stringify({ nombre, email, rol }));
 
-      // Alerta visual confirmando el éxito de la operación
       alert("🎉 ¡Tu cuenta fue creada con éxito! Bienvenido a MapFlash.");
-      
-      // Redireccionamos de manera automática al mapa principal
       window.location.href = '/mapa';
 
     } catch (error: any) {
@@ -161,12 +159,43 @@ export default function Home() {
 
       {/* ── PANEL DERECHO ── */}
       <div className="flex-1 bg-white p-8 flex flex-col justify-center items-center relative">
-        {/* Navegacion rapida */}
-        <div className="absolute top-5 right-6 flex gap-3 text-xs font-medium">
-          <Link href="/mapa"      className="text-blue-600 hover:underline">🗺️ Mapa</Link>
-          <Link href="/tarifas"   className="text-blue-600 hover:underline">💰 Tarifas</Link>
-          <Link href="/comunidad" className="text-blue-600 hover:underline">💬 Comunidad</Link>
-          <Link href="/entrega"   className="text-blue-600 hover:underline">📦 Entrega</Link>
+        
+        {/* Navegacion rapida unificada con SUBMENÚ */}
+        <div className="absolute top-5 right-6 flex gap-4 text-xs font-medium items-center z-50">
+          <Link href="/mapa" className="text-gray-600 hover:text-blue-600 transition">🗺️ Mapa</Link>
+          
+          {/* Submenú interactivo para Conductores */}
+          <div className="relative">
+            <button 
+              type="button"
+              onClick={() => setShowMenu(!showMenu)}
+              className="text-gray-600 hover:text-blue-600 transition flex items-center gap-0.5 focus:outline-none"
+            >
+              🚗 Conductores <span className="text-[10px]">{showMenu ? '▲' : '▼'}</span>
+            </button>
+            
+            {showMenu && (
+              <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-100 rounded-xl shadow-lg p-1.5 flex flex-col gap-1">
+                <Link 
+                  href="/tarifas" 
+                  onClick={() => setShowMenu(false)}
+                  className="p-2 text-gray-700 hover:bg-slate-50 hover:text-blue-600 rounded-lg text-left transition block"
+                >
+                  💰 Tabla de Tarifas
+                </Link>
+                <button 
+                  type="button"
+                  onClick={() => { setTab('register'); setRol('conductor'); setShowMenu(false); }}
+                  className="p-2 text-gray-700 hover:bg-slate-50 hover:text-blue-600 rounded-lg text-left transition block w-full"
+                >
+                  📝 Unirse como Conductor
+                </button>
+              </div>
+            )}
+          </div>
+
+          <Link href="/comunidad" className="text-gray-600 hover:text-blue-600 transition">💬 Comunidad</Link>
+          <Link href="/entrega"   className="text-gray-600 hover:text-blue-600 transition">📦 Entrega</Link>
         </div>
 
         <div className="w-full max-w-sm">
