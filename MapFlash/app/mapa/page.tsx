@@ -12,6 +12,7 @@ interface UsuarioSesion {
   nombre: string;
   email: string;
   rol: string;
+  avatar_url?: string; // Soportamos el campo opcional de foto de perfil
 }
 
 interface AlertaTrafico {
@@ -28,7 +29,7 @@ export default function MapaPage() {
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState<string | null>(null);
 
-  // 1. Cargar sesión e inicializar alertas
+  // Cargar sesión e inicializar alertas
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
@@ -42,7 +43,6 @@ export default function MapaPage() {
     obtenerReportesEnVivo();
   }, []);
 
-  // 2. Función para descargar los reportes activos desde Supabase
   const obtenerReportesEnVivo = async () => {
     try {
       const { data, error } = await supabase
@@ -72,11 +72,8 @@ export default function MapaPage() {
     }
   };
 
-  // 3. Crear alerta y recargar la lista automáticamente
   const handleCrearAlerta = async (tipo: string) => {
     setCargandoAlerta(tipo);
-    
-    // Aquí puedes usar navigator.geolocation.getCurrentPosition para obtener el GPS real del celular
     const latitudSimulada = -12.046374 + (Math.random() - 0.5) * 0.02; 
     const longitudSimulada = -77.042793 + (Math.random() - 0.5) * 0.02;
 
@@ -93,8 +90,6 @@ export default function MapaPage() {
         ]);
 
       if (error) throw error;
-      
-      // Volvemos a jalar los reportes de Supabase para que aparezca el nuevo en segundos
       obtenerReportesEnVivo();
       alert(`🚨 Alerta de [${tipo.toUpperCase()}] reportada con éxito de manera global.`);
     } catch (error: any) {
@@ -107,7 +102,7 @@ export default function MapaPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans flex flex-col relative">
       
-      {/* NAVBAR SUPERIOR */}
+      {/* ── NAVBAR SUPERIOR DINÁMICA CON FOTO DE PERFIL ── */}
       <header className="bg-white border-b border-slate-100 p-4 flex justify-between items-center shadow-sm z-10">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-xs font-bold text-slate-400 hover:text-blue-600 transition">
@@ -126,7 +121,18 @@ export default function MapaPage() {
           
           {usuario ? (
             <div className="flex items-center gap-2 bg-slate-900 text-white pl-3 pr-2 py-1.5 rounded-xl text-xs font-semibold shadow-sm">
-              <span>{getEmojiRol(usuario.rol)} {usuario.nombre}</span>
+              {/* Si el usuario tiene una avatar_url válida de Google, renderizamos la imagen de perfil */}
+              {usuario.avatar_url ? (
+                <img 
+                  src={usuario.avatar_url} 
+                  alt={usuario.nombre} 
+                  className="w-5 h-5 rounded-full object-cover border border-white/40"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <span>{getEmojiRol(usuario.rol)}</span>
+              )}
+              <span className="max-w-[100px] truncate">{usuario.nombre}</span>
               <button onClick={handleCerrarSesion} className="bg-white/10 hover:bg-red-500/20 text-red-400 p-1 rounded-md ml-1 text-[10px]">✕</button>
             </div>
           ) : (
@@ -144,7 +150,7 @@ export default function MapaPage() {
           loading="lazy"
         />
         
-        {/* Leyenda lateral flotante sobre el mapa que muestra qué alertas hay en la BD */}
+        {/* Panel de reportes */}
         <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm p-3 rounded-xl shadow-lg border border-slate-200 max-w-xs text-xs z-20 flex flex-col gap-2">
           <p className="font-bold text-slate-800 border-b pb-1">Reportes en tu zona</p>
           <div className="max-h-32 overflow-y-auto flex flex-col gap-1.5 w-40">
@@ -166,12 +172,12 @@ export default function MapaPage() {
         </div>
 
         <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-sm border border-slate-200 text-[11px] font-medium flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 anonymity animate-pulse"/>
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"/>
           Sistema GPS Activo · Perú
         </div>
       </div>
 
-      {/* BOTONES DE ALERTA DE INCIDENTES */}
+      {/* BOTONES DE INCIDENTES */}
       <footer className="bg-white border-t border-slate-100 p-4 shadow-md z-10">
         <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 text-center md:text-left">
           Alertar incidentes de tránsito en tu posición actual
