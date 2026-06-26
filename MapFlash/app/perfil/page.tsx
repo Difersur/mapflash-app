@@ -8,7 +8,7 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface Usuario {
-  id?: string; // Agregamos ID por si lo usas como llave primaria
+  id?: string;
   nombre: string;
   email: string;
   rol: string;
@@ -127,11 +127,15 @@ export default function PerfilPage() {
 
       const urlPublicaFoto = urlData.publicUrl;
 
-      // 3. NUEVO: Guardar la URL de la foto en la tabla de la base de datos vinculada al correo
+      // 3. SOLUCIÓN COMPLETA: Usamos upsert para insertar el usuario si no existe o actualizarlo si ya existe
       const { error: dbError } = await supabase
         .from('usuarios')
-        .update({ avatar_url: urlPublicaFoto })
-        .eq('email', usuario.email);
+        .upsert({ 
+          email: usuario.email, 
+          nombre: usuario.nombre, 
+          rol: usuario.rol,
+          avatar_url: urlPublicaFoto 
+        }, { onConflict: 'email' });
 
       if (dbError) throw dbError;
 
