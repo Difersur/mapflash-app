@@ -1,305 +1,207 @@
 'use client';
-// Panel de administrador MapFlash conectado a Supabase de forma segura
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicializamos el cliente de Supabase usando tus variables de entorno de Vercel
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-const PIN_DEMO = "482715"; // código 2FA de demo
+interface AlertaAdmin {
+  id: number;
+  tipo_reporte: string;
+  latitud: number;
+  longitud: number;
+  estado: string;
+  created_at?: string;
+}
 
-type Pantalla = 'login' | '2fa' | 'panel';
-type SeccionAdmin = 'dashboard' | 'recargos' | 'fondos' | 'usuarios' | 'seguridad';
+export default function AdminPage() {
+  const [reportes, setReportes] = useState<AlertaAdmin[]>([]);
+  const [cargando, setCargando] = useState(true);
+  const [autorizado, setAutorizado] = useState(false);
 
-export default function Admin() {
-  const [pantalla, setPantalla] = useState<Pantalla>('login');
-  const [email, setEmail] = useState('');
-  const [pass, setPass] = useState('');
-  const [codigo, setCodigo] = useState('');
-  const [intentos, setIntentos] = useState(0);
-  const [error, setError] = useState('');
-  const [seccion, setSeccion] = useState<SeccionAdmin>('dashboard');
-  const [pinFondos, setPinFondos] = useState('');
-  const [pinOk, setPinOk] = useState(false);
-
-  async function login() {
-    setError('');
-    if (!email || !pass) {
-      setError('Por favor, rellena todos los campos');
-      return;
+  useEffect(() => {
+    // Verificar si el usuario en sesión realmente tiene rol de administrador
+    const sesionGuardada = localStorage.getItem('usuario_mapflash');
+    if (sesionGuardada) {
+      const user = JSON.parse(sesionGuardada);
+      const rol = user.rol ? user.rol.toLowerCase() : '';
+      
+      if (rol === 'admin') {
+        setAutorizado(true);
+        obtenerTodosLosReportes();
+      } else {
+        setCargando(false);
+      }
+    } else {
+      setCargando(false);
     }
+  }, []);
 
+  const obtenerTodosLosReportes = async () => {
+    setCargando(true);
+    const { data, error } = await supabase
+      .from('alertas_trafico')
+      .select('*')
+      .order('id', { ascending: false });
+
+    if (data) setReportes(data);
+    if (error) console.error("Error cargando alertas globales:", error.message);
+    setCargando(false);
+  };
+
+  // Función para dar de baja un reporte viejo o falso directamente desde la tabla
+  const handleCambiarEstado = async (id: number, nuevoEstado: string) => {
     try {
-      // Consultamos de forma segura en Supabase si el usuario existe y es admin
-      const { data, error: dbError } = await supabase
-        .from('usuarios')
-        .select('*')
-        .eq('email', email.trim())
-        .eq('password', pass)
-        .single();
+      const { error } = await supabase
+        .from('alertas_trafico')
+        .update({ estado: nuevoEstado })
+        .eq('id', id);
 
-      if (dbError || !data) {
-        setError('Credenciales incorrectas');
-        return;
-      }
-
-      if (data.rol !== 'admin') {
-        setError('Acceso denegado: No tienes permisos de administrador');
-        return;
-      }
-
-      // Si todo está bien, avanzamos al segundo factor de autenticación (2FA)
-      setPantalla('2fa');
-    } catch (err) {
-      setError('Error al conectar con el servidor de autenticación');
+      if (error) throw error;
+      
+      // Actualizar la interfaz local inmediatamente
+      setReportes(reportes.map(r => r.id === id ? { ...r, estado: nuevoEstado } : r));
+    } catch (err: any) {
+      alert("No se pudo actualizar el reporte: " + err.message);
     }
+  };
+
+  // Filtrar estadísticas rápidas para los cuadros superiores
+  const alertasActivas = reportes.filter(r => r.estado === 'activo').length;
+  const alertasResueltas = reportes.filter(r => r.estado === 'resuelto').length;
+
+  if (cargando) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-slate-200">
+        <p className="text-sm font-semibold animate-pulse">Cargando Panel de Control...</p>
+      </div>
+    );
   }
 
-  function verificar2FA() {
-    if (codigo === PIN_DEMO) {
-      setPantalla('panel');
-      setError('');
-    } else {
-      setIntentos(intentos + 1);
-      setError(`Código incorrecto. Intento ${intentos + 1} de 3`);
-      if (intentos >= 2) {
-        setError('Demasiados intentos. Bloqueado por seguridad.');
-        setPantalla('login');
-        setIntentos(0);
-      }
-    }
+  if (!autorizado) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <div className="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-sm text-center shadow-2xl">
+          <span className="text-4xl">🛑</span>
+          <h2 className="text-white font-bold text-lg mt-4 mb-2">Acceso Denegado</h2>
+          <p className="text-slate-400 text-xs mb-6">Tu usuario no cuenta con privilegios de Administrador para ver esta sección.</p>
+          <Link href="/mapa" className="w-full block bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2.5 rounded-xl transition">
+            Volver al Mapa
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white font-sans antialiased selection:bg-amber-500/30 selection:text-amber-200">
-      {/* PANTALLA LOGIN */}
-      {pantalla === 'login' && (
-        <div className="flex min-h-screen items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-8 shadow-2xl backdrop-blur-sm">
-            <div className="text-center">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-3">
-                ⚡
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight text-neutral-100">Panel de Control</h2>
-              <p className="mt-1 text-sm text-neutral-400">Inicia sesión de forma segura como Administrador</p>
-            </div>
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
+      
+      {/* Encabezado del Panel */}
+      <header className="bg-slate-900 border-b border-slate-800 p-5 flex justify-between items-center shadow-lg">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="bg-blue-500/10 text-blue-400 text-[10px] px-2 py-0.5 rounded-md border border-blue-500/20 font-bold uppercase tracking-wider">Master</span>
+            <h1 className="text-base font-bold text-white">MapFlash Central Panel</h1>
+          </div>
+          <p className="text-[11px] text-slate-400 mt-0.5">Control de incidencias de tránsito y conductores</p>
+        </div>
+        <Link href="/mapa" className="text-xs bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-xl border border-slate-700 transition font-medium">
+          Ir al Mapa Nacional
+        </Link>
+      </header>
 
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Correo Electrónico</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-100 placeholder-neutral-600 transition focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-                  placeholder="admin@ejemplo.com"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Contraseña</label>
-                <input
-                  type="password"
-                  value={pass}
-                  onChange={(e) => setPass(e.target.value)}
-                  className="mt-1 block w-full rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-neutral-100 placeholder-neutral-600 transition focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-                  placeholder="••••••••"
-                />
-              </div>
-
-              {error && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center text-xs font-medium text-red-400">
-                  ⚠️ {error}
-                </div>
-              )}
-
-              <button
-                onClick={login}
-                className="w-full rounded-xl bg-amber-500 py-3 text-sm font-semibold text-neutral-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98]"
-              >
-                Ingresar al Sistema
-              </button>
-            </div>
+      {/* Contenido Principal */}
+      <main className="flex-1 p-4 md:p-6 max-w-6xl w-full mx-auto space-y-6">
+        
+        {/* Fila de Estadísticas Rápidas (Cards) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-md">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Alertas Activas (Perú)</p>
+            <p className="text-2xl font-black text-amber-400 mt-1">{alertasActivas} <span className="text-xs font-normal text-slate-500">en vivo</span></p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-md">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Incidentes Archivados</p>
+            <p className="text-2xl font-black text-emerald-400 mt-1">{alertasResueltas} <span className="text-xs font-normal text-slate-500">atendidos</span></p>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-md">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Historial Registrado</p>
+            <p className="text-2xl font-black text-blue-400 mt-1">{reportes.length} <span className="text-xs font-normal text-slate-500">totales</span></p>
           </div>
         </div>
-      )}
 
-      {/* PANTALLA VERIFICACIÓN 2FA */}
-      {pantalla === '2fa' && (
-        <div className="flex min-h-screen items-center justify-center p-4">
-          <div className="w-full max-w-md space-y-6 rounded-2xl border border-neutral-800 bg-neutral-900 p-8 shadow-2xl">
-            <div className="text-center">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-3">
-                🛡️
-              </div>
-              <h2 className="text-2xl font-bold tracking-tight text-neutral-100">Verificación de Identidad</h2>
-              <p className="mt-1 text-sm text-neutral-400">Introduce el código 2FA para completar el acceso</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Código de Seguridad</label>
-                <input
-                  type="text"
-                  maxLength={6}
-                  value={codigo}
-                  onChange={(e) => setCodigo(e.target.value)}
-                  className="mt-1 block w-full text-center tracking-[0.5em] rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-3 text-lg font-bold text-neutral-100 placeholder-neutral-700 transition focus:border-amber-500/50 focus:outline-none focus:ring-1 focus:ring-amber-500/50"
-                  placeholder="000000"
-                />
-              </div>
-
-              {error && (
-                <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-center text-xs font-medium text-red-400">
-                  {error}
-                </div>
-              )}
-
-              <button
-                onClick={verificar2FA}
-                className="w-full rounded-xl bg-amber-500 py-3 text-sm font-semibold text-neutral-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-[0.98]"
-              >
-                Verificar Código
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* PANEL DE ADMINISTRADOR GENERAL COMPLETO */}
-      {pantalla === 'panel' && (
-        <div className="flex min-h-screen">
-          {/* BARRA LATERAL (SIDEBAR) */}
-          <aside className="w-64 border-r border-neutral-800 bg-neutral-900/50 backdrop-blur-md p-6 flex flex-col justify-between">
-            <div className="space-y-6">
-              <div className="flex items-center space-x-2 px-2">
-                <span className="text-xl">⚡</span>
-                <span className="font-bold tracking-wider text-neutral-200">MapFlash Admin</span>
-              </div>
-              
-              <nav className="space-y-1">
-                {[
-                  { id: 'dashboard', label: '📊 Dashboard' },
-                  { id: 'recargos', label: '💸 Recargos' },
-                  { id: 'fondos', label: '🏦 Fondos Sistema' },
-                  { id: 'usuarios', label: '👥 Usuarios' },
-                  { id: 'seguridad', label: '🔒 Seguridad API' }
-                ].map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => setSeccion(item.id as SeccionAdmin)}
-                    className={`w-full text-left px-4 py-3 rounded-xl text-sm font-medium transition duration-150 ${
-                      seccion === item.id 
-                        ? 'bg-amber-500 text-neutral-950 font-semibold shadow-lg shadow-amber-500/10' 
-                        : 'text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-200'
-                    }`}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-            </div>
-
-            <button
-              onClick={() => { setPantalla('login'); setPinOk(false); setPinFondos(''); }}
-              className="w-full text-left px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition duration-150"
+        {/* Tabla de Gestión de Incidentes */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+            <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Listado General de Incidentes</h2>
+            <button 
+              onClick={obtenerTodosLosReportes}
+              className="text-[11px] text-blue-400 hover:underline font-semibold"
             >
-              🚪 Cerrar Sesión
+              🔄 Actualizar Datos
             </button>
-          </aside>
+          </div>
 
-          {/* VISTAS CENTRALES DEL PANEL */}
-          <main className="flex-1 p-10 bg-neutral-950 overflow-y-auto">
-            {/* 1. SECCIÓN DASHBOARD */}
-            {seccion === 'dashboard' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold text-neutral-100">Dashboard</h1>
-                  <p className="text-sm text-neutral-400 mt-1">Resumen general del estado de MapFlash</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="border border-neutral-800 bg-neutral-900 p-6 rounded-2xl"><p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Usuarios Activos</p><p className="text-3xl font-bold mt-2 text-amber-500">248</p></div>
-                  <div className="border border-neutral-800 bg-neutral-900 p-6 rounded-2xl"><p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Recaudación Mensual</p><p className="text-3xl font-bold mt-2 text-green-500">$3,420 USD</p></div>
-                  <div className="border border-neutral-800 bg-neutral-900 p-6 rounded-2xl"><p className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">Estado de API</p><p className="text-3xl font-bold mt-2 text-blue-500">Operacional</p></div>
-                </div>
-              </div>
-            )}
-
-            {/* 2. SECCIÓN RECARGOS */}
-            {seccion === 'recargos' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold text-neutral-100">Gestión de Recargos</h1>
-                  <p className="text-sm text-neutral-400 mt-1">Configuración de tarifas, pasarelas e impuestos aplicados</p>
-                </div>
-                <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-6 text-center text-neutral-500 text-sm">Módulo listo. No hay recargos extraordinarios pendientes de procesar.</div>
-              </div>
-            )}
-
-            {/* 3. SECCIÓN FONDOS SISTEMA (PROTEGIDA POR PIN INTERNO) */}
-            {seccion === 'fondos' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold text-neutral-100">Fondos del Sistema</h1>
-                  <p className="text-sm text-neutral-400 mt-1">Balances globales de cuentas de la plataforma y bóveda</p>
-                </div>
-                {!pinOk ? (
-                  <div className="max-w-md border border-neutral-800 bg-neutral-900 rounded-2xl p-6 space-y-4">
-                    <p className="text-sm text-amber-400">🔒 Esta sección requiere una verificación adicional del PIN de Fondos.</p>
-                    <input
-                      type="password"
-                      maxLength={6}
-                      value={pinFondos}
-                      onChange={(e) => setPinFondos(e.target.value)}
-                      className="block w-full text-center tracking-widest rounded-xl border border-neutral-800 bg-neutral-950 px-4 py-2 text-sm text-neutral-100 focus:border-amber-500/50 focus:outline-none"
-                      placeholder="Introduce PIN de Fondos"
-                    />
-                    <button 
-                      onClick={() => { if(pinFondos === PIN_DEMO){ setPinOk(true); setError(''); } else { alert('PIN de fondos incorrecto'); } }}
-                      className="w-full rounded-xl bg-amber-500 py-2 text-xs font-semibold text-neutral-950 hover:bg-amber-400 transition"
-                    >
-                      Desbloquear Fondos
-                    </button>
-                  </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-950 text-slate-400 border-b border-slate-800">
+                  <th className="p-4 font-bold uppercase tracking-wider">ID</th>
+                  <th className="p-4 font-bold uppercase tracking-wider">Tipo Reporte</th>
+                  <th className="p-4 font-bold uppercase tracking-wider">Ubicación (Lat, Lng)</th>
+                  <th className="p-4 font-bold uppercase tracking-wider">Estado</th>
+                  <th className="p-4 font-bold uppercase tracking-wider text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {reportes.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="p-8 text-center text-slate-500 italic">No se encontraron alertas en la base de datos.</td>
+                  </tr>
                 ) : (
-                  <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-6 space-y-4">
-                    <p className="text-xs text-green-400 font-semibold">✓ Acceso Autorizado</p>
-                    <div className="text-2xl font-mono font-bold text-neutral-200">Balance Bóveda: $18,450.00 USD</div>
-                  </div>
+                  reportes.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-800/30 transition">
+                      <td className="p-4 text-slate-500 font-mono">#{r.id}</td>
+                      <td className="p-4 font-semibold text-slate-200">
+                        {r.tipo_reporte === 'Accidente' ? '🚨' : r.tipo_reporte === 'Tráfico' ? '🚗' : r.tipo_reporte === 'Operativo' ? '👮' : '🚧'} {r.tipo_reporte}
+                      </td>
+                      <td className="p-4 text-slate-400 font-mono text-[11px]">
+                        {r.latitud.toFixed(5)}, {r.longitud.toFixed(5)}
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          r.estado === 'activo' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          {r.estado}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right space-x-2">
+                        {r.estado === 'activo' ? (
+                          <button
+                            onClick={() => handleCambiarEstado(r.id, 'resuelto')}
+                            className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold px-2.5 py-1 rounded-lg transition text-[10px]"
+                          >
+                            ✓ Resolver
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleCambiarEstado(r.id, 'activo')}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-2.5 py-1 rounded-lg transition text-[10px]"
+                          >
+                            ⚡ Reactivar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
                 )}
-              </div>
-            )}
-
-            {/* 4. SECCIÓN USUARIOS */}
-            {seccion === 'usuarios' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold text-neutral-100">Control de Usuarios</h1>
-                  <p className="text-sm text-neutral-400 mt-1">Lista, roles y permisos de los miembros registrados</p>
-                </div>
-                <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-6 text-center text-neutral-500 text-sm">Los usuarios registrados se gestionan y sincronizan ahora automáticamente mediante Supabase.</div>
-              </div>
-            )}
-
-            {/* 5. SECCIÓN SEGURIDAD */}
-            {seccion === 'seguridad' && (
-              <div className="space-y-6">
-                <div>
-                  <h1 className="text-3xl font-bold text-neutral-100">Seguridad API</h1>
-                  <p className="text-sm text-neutral-400 mt-1">Logs de acceso, llaves de desarrollo y tokens</p>
-                </div>
-                <div className="border border-neutral-800 bg-neutral-900 rounded-2xl p-6 text-sm space-y-2 text-neutral-400">
-                  <p>• Conexión SSL activa con cifrado TLS 1.3</p>
-                  <p>• Autenticación delegada dinámicamente mediante variables seguras en el servidor</p>
-                </div>
-              </div>
-            )}
-          </main>
+              </tbody>
+            </table>
+          </div>
         </div>
-      )}
+
+      </main>
     </div>
   );
 }
