@@ -35,7 +35,6 @@ export default function PerfilPage() {
       }
     }
     
-    // Limpieza de la cámara si el usuario abandona la página abruptamente
     return () => {
       apagarCamara();
     };
@@ -52,14 +51,13 @@ export default function PerfilPage() {
       streamRef.current = stream;
       setCamaraActiva(true);
       
-      // Asignar el stream al elemento de video de HTML
       setTimeout(() => {
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
         }
       }, 100);
     } catch (err) {
-      alert("No se pudo acceder a la cámara. Asegúrate de dar los permisos correspondientes.");
+      alert("No se pudo acceder a la cámara. Asegúrate de otorgar los permisos en el navegador.");
     }
   };
 
@@ -71,7 +69,7 @@ export default function PerfilPage() {
     setCamaraActiva(false);
   };
 
-  // Capturar la foto actual del flujo del video mediante un Canvas
+  // Capturar la foto instantánea desde el video
   const capturarFoto = () => {
     if (!videoRef.current) return;
 
@@ -82,12 +80,10 @@ export default function PerfilPage() {
 
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Invertir horizontalmente para efecto espejo natural
       ctx.translate(canvas.width, 0);
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      // Convertir el canvas a un Blob de tipo imagen
       canvas.toBlob((blob) => {
         if (blob) {
           const archivoCapturado = new File([blob], "foto-camara.jpg", { type: "image/jpeg" });
@@ -99,7 +95,6 @@ export default function PerfilPage() {
     }
   };
 
-  // Manejar subida tradicional de archivos locales
   const handleCambiarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     apagarCamara();
     if (e.target.files && e.target.files[0]) {
@@ -109,7 +104,6 @@ export default function PerfilPage() {
     }
   };
 
-  // Subida final hacia Supabase Storage
   const handleSubirFoto = async () => {
     if (!usuario || !archivo) {
       alert("Por favor, selecciona o toma una fotografía primero.");
@@ -121,21 +115,18 @@ export default function PerfilPage() {
     try {
       const nombreArchivo = `${usuario.email}-${Date.now()}.jpg`;
 
-      // Subir archivo al bucket "avatars" que creaste
       const { error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(nombreArchivo, archivo, { cacheControl: '3600', upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Obtener URL de acceso público
       const { data: urlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(nombreArchivo);
 
       const urlPublicaFoto = urlData.publicUrl;
 
-      // Actualizar sesión en localStorage
       const usuarioActualizado = { ...usuario, avatar_url: urlPublicaFoto };
       localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
       setUsuario(usuarioActualizado);
@@ -160,6 +151,9 @@ export default function PerfilPage() {
     );
   }
 
+  // Normalizamos el rol pasándolo a minúsculas para evitar problemas de cruces
+  const rolNormalizado = usuario.rol ? usuario.rol.toLowerCase() : '';
+
   return (
     <div className="min-h-screen bg-slate-100 font-sans flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
@@ -175,10 +169,9 @@ export default function PerfilPage() {
           </Link>
         </div>
 
-        {/* Contenido de la Tarjeta */}
+        {/* Contenido */}
         <div className="p-6 flex flex-col items-center">
           
-          {/* Círculo del Avatar */}
           <div className="relative w-24 h-24 mb-4">
             {vistaPrevia ? (
               <img 
@@ -194,8 +187,10 @@ export default function PerfilPage() {
           </div>
 
           <h2 className="text-base font-bold text-slate-800">{usuario.nombre}</h2>
+          
+          {/* AQUÍ CORREGIMOS EL SINO DE MAYÚSCULAS: Soporta 'Entrega' y 'entrega' */}
           <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider mt-1 mb-6">
-            {usuario.rol === 'entrega' ? '📦 Conductor' : '👤 Usuario'}
+            {rolNormalizado === 'entrega' ? '📦 Conductor' : '👤 Usuario'}
           </span>
 
           <div className="w-full space-y-4 border-t border-slate-100 pt-4">
@@ -204,7 +199,7 @@ export default function PerfilPage() {
               <p className="text-sm text-slate-700 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">{usuario.email}</p>
             </div>
 
-            {/* CONTROL DE MULTIMEDIA Y CÁMARA */}
+            {/* SECCIÓN MULTIMEDIA COMPLETA */}
             <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
               <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-3">Actualizar Fotografía</label>
               
