@@ -7,158 +7,213 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-interface Usuario {
+interface UsuarioSesion {
   nombre: string;
   email: string;
   rol: string;
   avatar_url?: string;
 }
 
-export default function PerfilPage() {
-  const [usuario, setUsuario] = useState<Usuario | null>(null);
-  const [archivo, setArchivo] = useState<File | null>(null);
-  const [vistaPrevia, setVistaPrevia] = useState<string>('');
-  const [guardando, setGuardando] = useState(false);
+interface AlertaTrafico {
+  id: number;
+  tipo_reporte: string;
+  latitud: number;
+  longitud: number;
+  estado: string;
+}
+
+export default function MapaPage() {
+  const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
+  const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
+  const [cargandoAlerta, setCargandoAlerta] = useState(false);
 
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
-      const datosUser = JSON.parse(sesionGuardada);
-      setUsuario(datosUser);
-      if (datosUser.avatar_url) {
-        setVistaPrevia(datosUser.avatar_url);
-      }
+      setUsuario(JSON.parse(sesionGuardada));
     }
+    obtenerReportesEnVivo();
   }, []);
 
-  // Manejar la selección del archivo desde el dispositivo
-  const handleCambiarArchivo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setArchivo(file);
-      // Crear una URL temporal para mostrar la foto en el círculo azul antes de subirla
-      setVistaPrevia(URL.createObjectURL(file));
-    }
+  const obtenerReportesEnVivo = async () => {
+    const { data, error } = await supabase
+      .from('alertas_trafico')
+      .select('*')
+      .eq('estado', 'activo');
+
+    if (data) setReportes(data);
+    if (error) console.error("Error cargando alertas:", error.message);
   };
 
-  const handleSubirFoto = async () => {
-    if (!usuario || !archivo) {
-      alert("Por favor, selecciona una imagen primero.");
+  const handleCerrarSesion = () => {
+    localStorage.removeItem('usuario_mapflash');
+    window.location.href = '/';
+  };
+
+  const getEmojiRol = (rol: string) => {
+    const r = rol ? rol.toLowerCase() : '';
+    if (r === 'admin') return '👑';
+    if (r === 'entrega') return '📦';
+    return '👤';
+  };
+
+  const handleCrearAlerta = async (tipo: string) => {
+    if (!usuario) {
+      alert("Debes iniciar sesión para reportar incidentes.");
       return;
     }
+    setCargandoAlerta(true);
+    
+    let lat = -12.046374;
+    let lng = -77.042793;
 
-    setGuardando(true);
-
-    try {
-      // 1. Crear un nombre único para el archivo basado en el correo del usuario
-      const nombreArchivo = `${usuario.email}-${Date.now()}.${archivo.name.split('.').pop()}`;
-
-      // 2. Subir el archivo al bucket "avatars" de Supabase
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(nombreArchivo, archivo, { cacheControl: '3600', upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // 3. Obtener la URL pública del archivo subido
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(nombreArchivo);
-
-      const urlPublicaFoto = urlData.publicUrl;
-
-      // 4. Actualizar la sesión local en el navegador
-      const usuarioActualizado = { ...usuario, avatar_url: urlPublicaFoto };
-      localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
-      setUsuario(usuarioActualizado);
-
-      alert("¡Fotografía actualizada con éxito! 📸");
-    } catch (error: any) {
-      console.error(error);
-      alert("Error al subir la imagen: " + error.message);
-    } finally {
-      setGuardando(false);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+          await guardarAlerta(tipo, lat, lng);
+        },
+        async () => {
+          await guardarAlerta(tipo, lat, lng);
+        }
+      );
+    } else {
+      await guardarAlerta(tipo, lat, lng);
     }
   };
 
-  if (!usuario) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
-        <div className="bg-white p-6 rounded-2xl shadow-sm text-center">
-          <p className="text-sm text-slate-500 mb-4">No has iniciado sesión de forma activa.</p>
-          <Link href="/" className="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl">Ir al Inicio</Link>
-        </div>
-      </div>
-    );
-  }
+  const guardarAlerta = async (tipo: string, lat: number, lng: number) => {
+    try {
+      const { error } = await supabase
+        .from('alertas_trafico')
+        .insert([{ tipo_reporte: tipo, latitud: lat, longitud: lng, estado: 'activo' }]);
+
+      if (error) throw error;
+      alert(`¡Alerta de ${tipo} registrada con éxito!`);
+      obtenerReportesEnVivo();
+    } catch (err: any) {
+      alert("No se pudo registrar el reporte: " + err.message);
+    } finally {
+      setCargandoAlerta(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-sans flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
-        
-        {/* Cabecera */}
-        <div className="bg-slate-950 text-white p-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-lg font-bold">Mi Perfil</h1>
-            <p className="text-[11px] text-slate-400">MapFlash ID verificado</p>
-          </div>
-          <Link href="/mapa" className="text-[11px] bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition">
-            ← Volver al Mapa
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between">
+      
+      {/* Barra de Navegación Superior */}
+      <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-sm text-slate-400 hover:text-white transition">
+            ← MapFlash
           </Link>
+          <h1 className="text-lg font-bold text-white tracking-tight">Mapa Nacional del Perú</h1>
         </div>
 
-        {/* Contenido de la Tarjeta */}
-        <div className="p-6 flex flex-col items-center">
+        <div className="flex items-center gap-3">
+          <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
+            🔥 {reportes.length} Alertas activas
+          </span>
           
-          {/* Círculo de Avatar Interactivo */}
-          <div className="relative w-24 h-24 mb-4 group">
-            {vistaPrevia ? (
-              <img 
-                src={vistaPrevia} 
-                alt="Avatar" 
-                className="w-full h-full object-cover rounded-full border-4 border-blue-500 shadow-sm"
-              />
-            ) : (
-              <div className="w-full h-full bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl font-bold border-4 border-white shadow-sm">
-                {usuario.nombre.charAt(0).toUpperCase()}
-              </div>
-            )}
+          {usuario ? (
+            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+              <Link 
+                href="/perfil" 
+                className="text-xs font-semibold text-slate-200 hover:text-blue-400 transition flex items-center gap-1"
+                title="Ver mi Perfil"
+              >
+                {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
+              </Link>
+              <button 
+                onClick={handleCerrarSesion}
+                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs"
+                title="Cerrar Sesión"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">
+              Iniciar Sesión
+            </Link>
+          )}
+        </div>
+      </header>
+
+      {/* Contenedor Principal del Mapa */}
+      <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
+        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900">
+          
+          {/* MAPA OFICIAL CONFIGURADO PARA EL PERÚ */}
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d3901.8656779834114!2d-77.042793!3d-12.046374!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses-419!2spe!4v1650000000000!5m2!1ses-419!2spe"
+            className="w-full h-full border-0 absolute inset-0"
+            allowFullScreen={true}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          ></iframe>
+
+          {/* Estado del Sistema flotante */}
+          <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700 shadow-lg flex items-center gap-2 z-10">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-semibold text-slate-200">Sistema GPS Activo · Perú</span>
           </div>
 
-          <h2 className="text-base font-bold text-slate-800">{usuario.nombre}</h2>
-          <span className="text-[10px] bg-blue-50 text-blue-600 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider mt-1 mb-6">
-            {usuario.rol === 'entrega' ? '📦 Conductor' : '👤 Usuario'}
-          </span>
-
-          <div className="w-full space-y-4 border-t border-slate-100 pt-4">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1">Correo Electrónico</label>
-              <p className="text-sm text-slate-700 font-medium bg-slate-50 p-2.5 rounded-xl border border-slate-100">{usuario.email}</p>
+          {/* Panel de reportes rápidos en la zona */}
+          <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en tu zona</h3>
+            <div className="max-h-32 overflow-y-auto flex flex-col gap-2">
+              {reportes.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
+              ) : (
+                reportes.map((r) => (
+                  <div key={r.id} className="text-xs bg-slate-800 p-2 rounded-lg border border-slate-700 flex justify-between items-center">
+                    <span className="capitalize text-slate-200 font-medium">⚠️ {r.tipo_reporte}</span>
+                    <span className="text-[10px] text-amber-400 font-bold">Activo</span>
+                  </div>
+                ))
+              )}
             </div>
+          </div>
 
-            {/* SELECCIÓN DE IMAGEN DESDE DISPOSITIVO */}
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Seleccionar nueva foto (JPG / PNG)</label>
-              <input 
-                type="file" 
-                accept="image/*"
-                onChange={handleCambiarArchivo}
-                className="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-              />
-            </div>
+        </div>
 
+        {/* Panel Inferior para Reportar Incidentes */}
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Alertar Incidentes de Tránsito en tu Posición Actual</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button
-              onClick={handleSubirFoto}
-              disabled={guardando || !archivo}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold text-xs py-3 rounded-xl transition shadow-sm mt-2"
+              onClick={() => handleCrearAlerta('Accidente')}
+              disabled={cargandoAlerta}
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
             >
-              {guardando ? 'Subiendo imagen...' : 'Guardar Cambios'}
+              🚨 Accidente
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Tráfico')}
+              disabled={cargandoAlerta}
+              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚗 Tráfico
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Operativo')}
+              disabled={cargandoAlerta}
+              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              👮 Operativo
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Vía Cerrada')}
+              disabled={cargandoAlerta}
+              className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚧 Vía Cerrada
             </button>
           </div>
-
         </div>
-
-      </div>
+      </main>
     </div>
   );
 }
