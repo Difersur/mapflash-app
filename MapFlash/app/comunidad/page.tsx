@@ -19,10 +19,17 @@ export default function Comunidad() {
   const [nuevoMensaje, setNuevoMensaje] = useState('');
   const [nombreFalso, setNombreFalso] = useState('');
   const [cargando, setCargando] = useState(false);
+  const [estaLogueado, setEstaLogueado] = useState(true); // Estado para controlar el localStorage de forma segura
 
-  // 1. Leer los mensajes de Supabase al cargar la pagina
+  // 1. Leer los mensajes de Supabase al cargar la pagina y verificar sesión de forma segura
   useEffect(() => {
     obtenerMensajes();
+    
+    // Verificamos el localStorage solo en el cliente
+    const sesionGuardada = localStorage.getItem('usuario_mapflash');
+    if (!sesionGuardada) {
+      setEstaLogueado(false);
+    }
   }, []);
 
   const obtenerMensajes = async () => {
@@ -93,7 +100,7 @@ export default function Comunidad() {
                 <span className="block text-xs font-bold text-blue-600 mb-0.5">{m.nombre_usuario}</span>
                 <p className="text-sm text-gray-800 leading-relaxed">{m.mensaje}</p>
                 <span className="block text-[9px] text-slate-400 text-right mt-1">
-                  {new Date(m.creado_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {m.creado_at ? new Date(m.creado_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                 </span>
               </div>
             ))
@@ -102,7 +109,7 @@ export default function Comunidad() {
 
         {/* Formulario de Entrada */}
         <form onSubmit={handleEnviar} className="p-4 border-t border-slate-100 bg-white flex flex-col gap-2">
-          {!localStorage.getItem('usuario_mapflash') && (
+          {!estaLogueado && (
             <input
               type="text"
               placeholder="Tu Apodo / Nombre (Opcional si no estas logueado)"
