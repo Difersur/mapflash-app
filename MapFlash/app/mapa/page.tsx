@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicialización de Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -26,15 +25,16 @@ export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
+  const [busqueda, setBusqueda] = useState('huancayo');
   
-  // Coordenadas fijas por defecto en Lima/Perú para el mapa limpio
-  const [gpsCoords] = useState({
+  // Coordenadas iniciales por defecto en el centro de Lima/Perú
+  const [gpsCoords, setGpsCoords] = useState({
     lat: -12.0464, 
     lng: -77.0428
   });
 
-  // URL corregida y limpia utilizando la API embebida oficial de Google Maps
-  const [mapUrl, setMapUrl] = useState(`https://maps.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}&z=15&output=embed`);
+  // URL del Iframe usando el servicio embebido estable
+  const [mapUrl, setMapUrl] = useState(`https://maps.google.com/maps?q=-12.0464,-77.0428&z=15&output=embed`);
 
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
@@ -44,7 +44,34 @@ export default function MapaPage() {
       setUsuario({ nombre: 'Joaquien', email: 'joaquien@mapflash.com', rol: 'admin' });
     }
     obtenerReportesEnVivo();
+    cargarUbicacionGps();
   }, []);
+
+  const cargarUbicacionGps = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newCoords = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setGpsCoords(newCoords);
+          setMapUrl(`https://maps.google.com/maps?q=${newCoords.lat},${newCoords.lng}&z=15&output=embed`);
+        },
+        (error) => {
+          console.error("Error cargando GPS, usando coordenadas fijas:", error.message);
+        },
+        { enableHighAccuracy: true }
+      );
+    }
+  };
+
+  // Función de búsqueda para que cargue cualquier lugar del mundo en el mapa
+  const handleBuscar = () => {
+    if (busqueda.trim() !== '') {
+      setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(busqueda)}&z=15&output=embed`);
+    }
+  };
 
   const obtenerReportesEnVivo = async () => {
     const { data, error } = await supabase
@@ -107,10 +134,29 @@ export default function MapaPage() {
         </div>
       </header>
       
-      {/* Contenedor Principal del Mapa */}
+      {/* Buscador Principal y Botón de Dijkstra */}
+      <div className="p-4 bg-[#1c2541] rounded-xl border border-[#3a506b]/30 mb-4 space-y-3 shadow-lg">
+        <div className="flex items-center border border-[#3a506b]/50 rounded-md overflow-hidden bg-[#0b1329]">
+          <span className="px-3 text-red-500 text-lg">●</span>
+          <input
+            type="text"
+            className="w-full py-2 px-1 text-sm outline-none bg-transparent text-white font-medium"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleBuscar(); }}
+          />
+          <button onClick={handleBuscar} className="bg-blue-600 text-white px-6 py-2 text-sm font-medium hover:bg-blue-700 transition">Buscar</button>
+        </div>
+
+        <button className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-700 transition shadow-sm">
+          Calcular ruta óptima con Dijkstra →
+        </button>
+      </div>
+
+      {/* Contenedor Principal del Mapa con Alto Completo */}
       <div className="flex-1 bg-[#1c2541] p-4 rounded-xl border border-[#3a506b]/30 mb-4 shadow-xl flex flex-col">
         <div className="flex items-start justify-between mb-3">
-          {/* Barra de Estado de GPS Simplificada */}
+          {/* Barra de Estado de GPS */}
           <div className="flex items-center space-x-3 bg-[#111827]/50 px-4 py-2 rounded-full font-medium text-sm shadow-inner border border-[#3a506b]/20">
             <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></span>
             <span className="text-emerald-400 font-semibold">Sistema GPS Activo</span>
@@ -118,7 +164,7 @@ export default function MapaPage() {
             <span className="text-white">Perú</span>
           </div>
           
-          {/* Cuadro Informativo Flotante Superior */}
+          {/* Cuadro Informativo Superior */}
           <div className="bg-[#111827]/80 p-4 rounded-xl w-80 shadow-2xl border border-[#3a506b]/30">
             <div className="flex justify-between items-center mb-1">
               <h4 className="font-bold text-xs tracking-wider text-gray-300 uppercase">REPORTES EN TU ZONA</h4>
@@ -128,11 +174,11 @@ export default function MapaPage() {
           </div>
         </div>
         
-        {/* Iframe del Mapa de Google Corregido */}
-        <div className="flex-1 relative min-h-[450px] bg-[#0b1329] rounded-xl overflow-hidden shadow-inner border border-[#3a506b]/30">
+        {/* Iframe del Mapa Ocupando el 100% Real de la Ventana */}
+        <div className="w-full flex-1 min-h-[550px] bg-[#0b1329] rounded-xl overflow-hidden shadow-inner border border-[#3a506b]/30 relative">
           <iframe
             src={mapUrl}
-            className="w-full h-full border-0 filter invert-[90%] hue-rotate-[180deg]"
+            className="absolute inset-0 w-full h-full border-0 filter invert-[90%] hue-rotate-[180deg]"
             allowFullScreen={true}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
