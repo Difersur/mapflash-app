@@ -1,8 +1,7 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Inicialización de Supabase
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -22,77 +21,30 @@ interface AlertaTrafico {
   estado: string;
 }
 
-// Sub-componente interno para renderizar el mapa de Leaflet de forma segura en Next.js
-function RenderMapa({ gpsCoords }: { gpsCoords: { lat: number; lng: number } }) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const leafletMap = useRef<any>(null);
-  const markerRef = useRef<any>(null);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && mapRef.current && !leafletMap.current) {
-      import('leaflet').then((L) => {
-        delete (L.Icon.Default.prototype as any)._getIconUrl;
-        L.Icon.Default.mergeOptions({
-          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-        });
-
-        // Inicializar el mapa centrado en tus coordenadas GPS por defecto
-        leafletMap.current = L.map(mapRef.current!).setView([gpsCoords.lat, gpsCoords.lng], 15);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(leafletMap.current);
-
-        // Marcador para tu ubicación actual
-        markerRef.current = L.marker([gpsCoords.lat, gpsCoords.lng])
-          .addTo(leafletMap.current)
-          .bindPopup('<b>Tu ubicación actual</b>')
-          .openPopup();
-
-        // Marcador fijo en el destino (Universidad Continental)
-        L.marker([-12.0528, -75.2032]).addTo(leafletMap.current)
-          .bindPopup('<b>Universidad Continental</b><br>Campus Huancayo');
-
-        // Línea azul de la ruta calculada por Dijkstra
-        const rutaDijkstra = [
-          [gpsCoords.lat, gpsCoords.lng],
-          [-12.0545, -75.2200],
-          [-12.0515, -75.2160],
-          [-12.0535, -75.2120],
-          [-12.0528, -75.2032]
-        ];
-
-        L.polyline(rutaDijkstra, { color: '#3b82f6', weight: 6, opacity: 0.9 }).addTo(leafletMap.current);
-      });
-    }
-  }, []);
-
-  // Efecto para actualizar el mapa cuando cambien las coordenadas GPS
-  useEffect(() => {
-    if (leafletMap.current && gpsCoords) {
-      leafletMap.current.flyTo([gpsCoords.lat, gpsCoords.lng], 15);
-      if (markerRef.current) {
-        markerRef.current.setLatLng([gpsCoords.lat, gpsCoords.lng]);
-      }
-    }
-  }, [gpsCoords]);
-
-  return <div ref={mapRef} className="w-full h-full z-10" />;
-}
-
-// Componente principal de la página
 export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [busqueda, setBusqueda] = useState('universida continental');
   
-  // Coordenadas iniciales idénticas a tu captura de pantalla
-  const [gpsCoords, setGpsCoords] = useState({ lat: -12.0487, lng: -75.2280 });
+  // Coordenadas iniciales por defecto en Huancayo, Perú
+  const [gpsCoords, setGpsCoords] = useState({
+    lat: -12.0487, 
+    lng: -75.2280
+  });
 
-  // Geolocalización nativa para actualizar las coordenadas dinámicamente
+  useEffect(() => {
+    const sesionGuardada = localStorage.getItem('usuario_mapflash');
+    if (sesionGuardada) {
+      setUsuario(JSON.parse(sesionGuardada));
+    } else {
+      // Mock de respaldo por si no hay sesión iniciada
+      setUsuario({ nombre: 'Admin', email: 'admin@mapflash.com', rol: 'admin' });
+    }
+    obtenerReportesEnVivo();
+    cargarUbicacionGps();
+  }, []);
+
   const cargarUbicacionGps = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -103,21 +55,12 @@ export default function MapaPage() {
           });
         },
         (error) => {
-          console.error("Error obteniendo ubicación:", error.message);
+          console.error("Error cargando GPS, usando coordenadas fijas:", error.message);
         },
         { enableHighAccuracy: true }
       );
     }
   };
-
-  useEffect(() => {
-    const sesionGuardada = localStorage.getItem('usuario_mapflash');
-    if (sesionGuardada) {
-      setUsuario(JSON.parse(sesionGuardada));
-    }
-    obtenerReportesEnVivo();
-    cargarUbicacionGps();
-  }, []);
 
   const obtenerReportesEnVivo = async () => {
     const { data, error } = await supabase
@@ -155,8 +98,6 @@ export default function MapaPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col text-gray-800 font-sans select-none">
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
       {/* Header Superior */}
       <header className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between shadow-sm">
         <div className="flex items-center space-x-4">
@@ -186,7 +127,7 @@ export default function MapaPage() {
         </button>
       </div>
 
-      {/* Buscador y Botón de Dijkstra */}
+      {/* Buscador Principal */}
       <div className="p-4 bg-white space-y-3 shadow-inner">
         <div className="flex items-center border-2 border-blue-500 rounded-md overflow-hidden bg-white">
           <span className="px-3 text-red-500 text-lg">●</span>
@@ -199,22 +140,31 @@ export default function MapaPage() {
           <button className="bg-blue-600 text-white px-6 py-2 text-sm font-medium">Buscar</button>
         </div>
 
+        {/* Botón Verde de Dijkstra */}
         <button className="w-full bg-emerald-500 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-600 transition shadow-sm">
           Calcular ruta óptima con Dijkstra →
         </button>
       </div>
 
-      {/* Contenedor del Mapa e Info Flotante */}
+      {/* Contenedor del Mapa (Iframe de Google Maps) */}
       <div className="flex-1 relative min-h-[380px] bg-gray-200 border-b border-gray-300">
-        <RenderMapa gpsCoords={gpsCoords} />
+        <iframe
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3901.42847952405!2d-75.2155!3d-12.0555!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x910e964f4b16259f%3A0x67dbdfedfd6864de!2sUniversidad%20Continental!5e0!3m2!1ses-419!2spe!4v1719515000000!5m2!1ses-419!2spe"
+          className="w-full h-full border-0"
+          allowFullScreen={false}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+        ></iframe>
 
-        <div className="absolute top-4 left-4 z-[1000] bg-white p-3 rounded-md shadow-md border border-gray-200 max-w-xs text-xs space-y-1">
+        {/* Cuadro Informativo de Ruta Flotante */}
+        <div className="absolute top-4 left-4 z-50 bg-white p-3 rounded-md shadow-md border border-gray-200 max-w-xs text-xs space-y-1">
           <div className="font-semibold text-gray-800 flex items-center">
-            <span className="text-gray-400 mr-1.5">○</span> Ubicación Actual (GPS)
+            <span className="text-gray-400 mr-1.5">○</span> Lope de Vega 164, Huancayo 12006
           </div>
           <div className="font-semibold text-blue-600 flex items-center border-t pt-1 mt-1">
-            <span className="text-red-500 mr-1.5">📍</span> Universidad Continental - Campus Huancayo
+            <span className="text-red-500 mr-1.5">📍</span> Universidad Continental - Campus Huan...
           </div>
+          <span className="text-blue-500 text-[11px] block cursor-pointer hover:underline">Más opciones</span>
         </div>
       </div>
 
