@@ -20,38 +20,38 @@ interface AlertaTrafico {
   estado: string;
 }
 
-// Lógica de Grafos y Dijkstra para Huancayo / El Tambo
-const NODOS_HUANCAYO: Record<string, { lat: number; lng: number; conexiones: Record<string, number> }> = {
+// Grafo de nodos para la simulación del autómata de Dijkstra en Huancayo
+const NODOS_GRAFO: Record<string, { lat: number; lng: number; conexiones: Record<string, number> }> = {
   "Inicio": { lat: -12.0487, lng: -75.2280, conexiones: { "Av_Mariategui": 1.2, "Av_Ferrocarril": 1.8 } },
-  "Av_Mariategui": { lat: -12.0545, lng: -75.2200, conexiones: { "Inicio": 1.2, "Siglo_XX": 0.9, "El_Tambo": 1.1 } },
+  "Av_Mariategui": { lat: -12.0545, lng: -75.2200, conexiones: { "Inicio": 1.2, "El_Tambo": 1.1 } },
   "Av_Ferrocarril": { lat: -12.0515, lng: -75.2160, conexiones: { "Inicio": 1.8, "Siglo_XX": 0.7 } },
-  "Siglo_XX": { lat: -12.0535, lng: -75.2120, conexiones: { "Av_Mariategui": 0.9, "Av_Ferrocarril": 0.7, "Univ_Continental": 1.4 } },
+  "Siglo_XX": { lat: -12.0535, lng: -75.2120, conexiones: { "Av_Ferrocarril": 0.7, "Univ_Continental": 1.4 } },
   "El_Tambo": { lat: -12.0500, lng: -75.2100, conexiones: { "Av_Mariategui": 1.1, "Univ_Continental": 0.8 } },
   "Univ_Continental": { lat: -12.0528, lng: -75.2032, conexiones: { "Siglo_XX": 1.4, "El_Tambo": 0.8 } }
 };
 
-function calcularDijkstra(inicio: string, fin: string): string[] {
+function resolverDijkstra(inicio: string, fin: string): string[] {
   const distancias: Record<string, number> = {};
   const previos: Record<string, string | null> = {};
-  const nodos = new Set<string>();
+  const nodos Unvisited = new Set<string>();
 
-  for (let nodo in NODOS_HUANCAYO) {
+  for (let nodo in NODOS_GRAFO) {
     distancias[nodo] = nodo === inicio ? 0 : Infinity;
     previos[nodo] = null;
-    nodos.add(nodo);
+    nodosUnvisited.add(nodo);
   }
 
-  while (nodos.size > 0) {
-    let nodoActual = Array.from(nodos).reduce((minNodo, nodo) => 
-      distancias[nodo] < distancias[minNodo] ? nodo : minNodo, Array.from(nodos)[0]
+  while (nodosUnvisited.size > 0) {
+    let nodoActual = Array.from(nodosUnvisited).reduce((minNodo, nodo) => 
+      distancias[nodo] < distancias[minNodo] ? nodo : minNodo, Array.from(nodosUnvisited)[0]
     );
 
     if (distancias[nodoActual] === Infinity || nodoActual === fin) break;
-    nodos.delete(nodoActual);
+    nodosUnvisited.delete(nodoActual);
 
-    const conexiones = NODOS_HUANCAYO[nodoActual].conexiones;
+    const conexiones = NODOS_GRAFO[nodoActual].conexiones;
     for (let vecino in conexiones) {
-      if (nodos.has(vecino)) {
+      if (nodosUnvisited.has(vecino)) {
         let alt = distancias[nodoActual] + conexiones[vecino];
         if (alt < distancias[vecino]) {
           distancias[vecino] = alt;
@@ -75,8 +75,9 @@ export default function MapaPage() {
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [busqueda, setBusqueda] = useState('universidad continental');
-  const [rutaCalculada, setRutaCalculada] = useState<string[]>([]);
+  const [caminoDijkstra, setCaminoDijkstra] = useState<string[]>(["Inicio", "Av_Mariategui", "El_Tambo", "Univ_Continental"]);
   
+  // Ubicación del GPS dinámico (Huancayo por defecto)
   const [gpsCoords, setGpsCoords] = useState({ lat: -12.0487, lng: -75.2280 });
   const [mapUrl, setMapUrl] = useState('');
 
@@ -88,23 +89,28 @@ export default function MapaPage() {
       setUsuario({ nombre: 'Joaquien', email: 'joaquien@mapflash.com', rol: 'admin' });
     }
     obtenerReportesEnVivo();
-    actualizarMapaBase(gpsCoords.lat, gpsCoords.lng);
+    // Generar mapa inicial conectado automáticamente
+    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
   }, []);
 
-  const actualizarMapaBase = (lat: number, lng: number) => {
-    setMapUrl(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+  // Función núcleo: Conecta dinámicamente el origen (GPS) con el destino (Buscador)
+  const trazarRutaMapa = (origenLat: number, origenLng: number, destinoTexto: string) => {
+    const origenParam = `${origenLat},${origenLng}`;
+    const urlSugerida = `https://maps.google.com/maps?q=${origenParam}&saddr=${origenParam}&daddr=${encodeURIComponent(destinoTexto)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+    setMapUrl(urlSugerida);
   };
 
   const cargarUbicacionGps = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const newCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
-          setGpsCoords(newCoords);
-          actualizarMapaBase(newCoords.lat, newCoords.lng);
+          const nuevasCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
+          setGpsCoords(nuevasCoords);
+          trazarRutaMapa(nuevasCoords.lat, nuevasCoords.lng, busqueda);
         },
-        () => {
-          actualizarMapaBase(gpsCoords.lat, gpsCoords.lng);
+        (error) => {
+          console.error("Error al obtener GPS, usando posición actual:", error.message);
+          trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
         },
         { enableHighAccuracy: true }
       );
@@ -113,26 +119,16 @@ export default function MapaPage() {
 
   const handleBuscar = () => {
     if (busqueda.trim() !== '') {
-      setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(busqueda)}&z=15&output=embed`);
+      trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
     }
   };
 
-  const handleCalcularRutaDijkstra = () => {
-    const rutaNodos = calcularDijkstra("Inicio", "Univ_Continental");
-    setRutaCalculada(rutaNodos);
-    
-    // Convertimos los nodos del grafo en una cadena de parámetros de coordenadas para dibujar la trayectoria en Google Maps
-    const origen = `${NODOS_HUANCAYO["Inicio"].lat},${NODOS_HUANCAYO["Inicio"].lng}`;
-    const destino = `${NODOS_HUANCAYO["Univ_Continental"].lat},${NODOS_HUANCAYO["Univ_Continental"].lng}`;
-    const waypoints = rutaNodos
-      .filter(n => n !== "Inicio" && n !== "Univ_Continental")
-      .map(n => `${NODOS_HUANCAYO[n].lat},${NODOS_HUANCAYO[n].lng}`)
-      .join('|');
-
-    setMapUrl(`https://www.google.com/maps/embed/v1/directions?key=YOUR_API_KEY_HERE&origin=${origen}&destination=${destino}&waypoints=${waypoints}&mode=driving`);
-    
-    // Fallback dinámico inmediato si no usas API Key de Google Cloud Enterprise:
-    setMapUrl(`https://maps.google.com/maps?saddr=${origen}&daddr=${destino}&z=15&output=embed`);
+  const handleCalcularDijkstra = () => {
+    // Calcula la secuencia del autómata lógicamente
+    const rutaNodos = resolverDijkstra("Inicio", "Univ_Continental");
+    setCaminoDijkstra(rutaNodos);
+    // Refresca la conexión del mapa con el destino solicitado
+    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
   };
 
   const obtenerReportesEnVivo = async () => {
@@ -178,7 +174,7 @@ export default function MapaPage() {
         </div>
       </header>
       
-      {/* Buscador e Input de Texto */}
+      {/* Buscador de Direcciones Conectado */}
       <div className="p-4 bg-[#1c2541] rounded-xl border border-[#3a506b]/30 mb-4 space-y-3 shadow-lg">
         <div className="flex items-center border border-[#3a506b]/50 rounded-md overflow-hidden bg-[#0b1329]">
           <span className="px-3 text-red-500 text-lg">●</span>
@@ -192,39 +188,39 @@ export default function MapaPage() {
           <button onClick={handleBuscar} className="bg-blue-600 text-white px-6 py-2 text-sm font-medium hover:bg-blue-700 transition">Buscar</button>
         </div>
 
-        {/* Botón de Dijkstra ejecutable */}
-        <button onClick={handleCalcularRutaDijkstra} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-700 transition shadow-sm">
-          Calcular ruta óptma con Dijkstra →
+        {/* Botón de Dijkstra */}
+        <button onClick={handleCalcularDijkstra} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-700 transition shadow-sm">
+          Calcular ruta óptima con Dijkstra →
         </button>
       </div>
 
-      {/* Contenedor del Mapa */}
+      {/* Contenedor del Mapa e Interfaz de Estado */}
       <div className="flex-1 bg-[#1c2541] p-4 rounded-xl border border-[#3a506b]/30 mb-4 shadow-xl flex flex-col">
         <div className="flex items-start justify-between mb-3">
-          {/* Botón Mi Ubicación + GPS Integrado */}
+          {/* Botón de Ubicación GPS Activo */}
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 bg-[#111827]/50 px-4 py-2 rounded-full font-medium text-sm border border-[#3a506b]/20">
               <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></span>
               <span className="text-emerald-400 font-semibold">Sistema GPS Activo ({gpsCoords.lat.toFixed(2)}, {gpsCoords.lng.toFixed(2)})</span>
             </div>
-            <button onClick={cargarUbicacionGps} className="bg-[#0b1329] border border-[#3a506b]/50 text-xs px-3 py-2 rounded-full text-gray-300 hover:text-white transition">
+            <button onClick={cargarUbicacionGps} className="bg-[#0b1329] border border-[#3a506b]/50 text-xs px-4 py-2 rounded-full text-gray-300 hover:text-white transition font-medium">
               📍 Activar mi Ubicación
             </button>
           </div>
           
-          {/* Autómata / Panel de Ruta */}
+          {/* Panel del Autómata de Dijkstra */}
           <div className="bg-[#111827]/80 p-4 rounded-xl w-80 shadow-2xl border border-[#3a506b]/30">
             <div className="flex justify-between items-center mb-1">
-              <h4 className="font-bold text-xs tracking-wider text-gray-300 uppercase">Automáta Dijkstra</h4>
+              <h4 className="font-bold text-xs tracking-wider text-gray-300 uppercase">AUTOMÁTA DIJKSTRA</h4>
               <span className="text-emerald-400 font-bold text-xs">EN VIVO</span>
             </div>
             <div className="text-gray-400 font-medium text-xs break-words">
-              {rutaCalculada.length > 0 ? `Camino: ${rutaCalculada.join(' ➔ ')}` : 'Todo despejado por ahora 👍'}
+              Camino: {caminoDijkstra.join(' ➔ ')}
             </div>
           </div>
         </div>
         
-        {/* Iframe a Pantalla Completa Expandido */}
+        {/* Iframe del Mapa Conectado y Escalado */}
         <div className="w-full flex-1 min-h-[500px] bg-[#0b1329] rounded-xl overflow-hidden shadow-inner border border-[#3a506b]/30 relative">
           <iframe
             src={mapUrl}
@@ -236,7 +232,7 @@ export default function MapaPage() {
         </div>
       </div>
 
-      {/* Botones de Alertas Inferiores */}
+      {/* Alertas Inferiores */}
       <footer className="bg-[#1c2541] p-4 border border-[#3a506b]/30 rounded-xl shadow-xl">
         <span className="text-xs text-gray-400 block mb-4 font-bold uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO EN TU POSICIÓN ACTUAL</span>
         <div className="grid grid-cols-4 gap-4 text-xs font-semibold text-white">
