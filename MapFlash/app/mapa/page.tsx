@@ -27,23 +27,30 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [busqueda, setBusqueda] = useState('universida continental');
   
-  // Coordenadas iniciales por defecto en Huancayo, Perú
+  // Coordenadas fijas por defecto (Huancayo) que tenías al inicio
   const [gpsCoords, setGpsCoords] = useState({
     lat: -12.0487, 
     lng: -75.2280
   });
+
+  // Estado para controlar qué dirección o coordenadas muestra el iframe de Google Maps
+  const [mapUrl, setMapUrl] = useState('https://maps.google.com/maps?q=-12.0487,-75.2280&t=&z=15&ie=UTF8&iwloc=&output=embed');
 
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
     } else {
-      // Mock de respaldo por si no hay sesión iniciada
       setUsuario({ nombre: 'Admin', email: 'admin@mapflash.com', rol: 'admin' });
     }
     obtenerReportesEnVivo();
     cargarUbicacionGps();
   }, []);
+
+  // Actualiza el mapa automáticamente cuando cambia el GPS del dispositivo
+  useEffect(() => {
+    setMapUrl(`https://maps.google.com/maps?q=${gpsCoords.lat},${gpsCoords.lng}&t=&z=15&ie=UTF8&iwloc=&output=embed`);
+  }, [gpsCoords]);
 
   const cargarUbicacionGps = () => {
     if (navigator.geolocation) {
@@ -59,6 +66,13 @@ export default function MapaPage() {
         },
         { enableHighAccuracy: true }
       );
+    }
+  };
+
+  // 🔥 FUNCIÓN PARA BUSCAR EN TODOS LADOS: Actualiza el mapa con lo que escribas en la barra
+  const handleBuscar = () => {
+    if (busqueda.trim() !== '') {
+      setMapUrl(`https://maps.google.com/maps?q=${encodeURIComponent(busqueda)}&t=&z=15&ie=UTF8&iwloc=&output=embed`);
     }
   };
 
@@ -136,8 +150,9 @@ export default function MapaPage() {
             className="w-full py-2 px-1 text-sm outline-none font-medium text-gray-700"
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleBuscar(); }}
           />
-          <button className="bg-blue-600 text-white px-6 py-2 text-sm font-medium">Buscar</button>
+          <button onClick={handleBuscar} className="bg-blue-600 text-white px-6 py-2 text-sm font-medium hover:bg-blue-700">Buscar</button>
         </div>
 
         {/* Botón Verde de Dijkstra */}
@@ -146,12 +161,12 @@ export default function MapaPage() {
         </button>
       </div>
 
-      {/* Contenedor del Mapa (Iframe de Google Maps) */}
+      {/* Contenedor del Mapa (Iframe real corregido) */}
       <div className="flex-1 relative min-h-[380px] bg-gray-200 border-b border-gray-300">
         <iframe
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3901.42847952405!2d-75.2155!3d-12.0555!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x910e964f4b16259f%3A0x67dbdfedfd6864de!2sUniversidad%20Continental!5e0!3m2!1ses-419!2spe!4v1719515000000!5m2!1ses-419!2spe"
+          src={mapUrl}
           className="w-full h-full border-0"
-          allowFullScreen={false}
+          allowFullScreen={true}
           loading="lazy"
           referrerPolicy="no-referrer-when-downgrade"
         ></iframe>
