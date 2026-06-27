@@ -22,14 +22,13 @@ interface AlertaTrafico {
   estado: string;
 }
 
-// 📦 SUB-COMPONENTE INTERNO DEL MAPA (Para evitar el error de SSR en Vercel sin crear otro archivo)
+// Sub-componente interno para renderizar el mapa de Leaflet de forma segura en Next.js
 function RenderMapa({ gpsCoords }: { gpsCoords: { lat: number; lng: number } }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<any>(null);
   const markerRef = useRef<any>(null);
 
   useEffect(() => {
-    // Solo se ejecuta en el navegador (client-side)
     if (typeof window !== 'undefined' && mapRef.current && !leafletMap.current) {
       import('leaflet').then((L) => {
         delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -39,24 +38,24 @@ function RenderMapa({ gpsCoords }: { gpsCoords: { lat: number; lng: number } }) 
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
         });
 
-        // Inicializar el mapa centrado en tus coordenadas
+        // Inicializar el mapa centrado en tus coordenadas GPS por defecto
         leafletMap.current = L.map(mapRef.current!).setView([gpsCoords.lat, gpsCoords.lng], 15);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap'
+          attribution: '&copy; OpenStreetMap contributors'
         }).addTo(leafletMap.current);
 
-        // Marcador de Ubicación Actual
+        // Marcador para tu ubicación actual
         markerRef.current = L.marker([gpsCoords.lat, gpsCoords.lng])
           .addTo(leafletMap.current)
           .bindPopup('<b>Tu ubicación actual</b>')
           .openPopup();
 
-        // Marcador del Destino (Universidad Continental)
+        // Marcador fijo en el destino (Universidad Continental)
         L.marker([-12.0528, -75.2032]).addTo(leafletMap.current)
           .bindPopup('<b>Universidad Continental</b><br>Campus Huancayo');
 
-        // Ruta Dijkstra simulada desde tu posición hasta la Continental
+        // Línea azul de la ruta calculada por Dijkstra
         const rutaDijkstra = [
           [gpsCoords.lat, gpsCoords.lng],
           [-12.0545, -75.2200],
@@ -70,7 +69,7 @@ function RenderMapa({ gpsCoords }: { gpsCoords: { lat: number; lng: number } }) 
     }
   }, []);
 
-  // Mueve el mapa dinámicamente si cambia el GPS
+  // Efecto para actualizar el mapa cuando cambien las coordenadas GPS
   useEffect(() => {
     if (leafletMap.current && gpsCoords) {
       leafletMap.current.flyTo([gpsCoords.lat, gpsCoords.lng], 15);
@@ -83,17 +82,17 @@ function RenderMapa({ gpsCoords }: { gpsCoords: { lat: number; lng: number } }) 
   return <div ref={mapRef} className="w-full h-full z-10" />;
 }
 
-// 🌐 COMPONENTE PRINCIPAL DE LA PÁGINA
+// Componente principal de la página
 export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [busqueda, setBusqueda] = useState('universida continental');
   
-  // Coordenadas en Huancayo que tenías originalmente por defecto
+  // Coordenadas iniciales idénticas a tu captura de pantalla
   const [gpsCoords, setGpsCoords] = useState({ lat: -12.0487, lng: -75.2280 });
 
-  // Lógica de GPS nativo que recupera tu posición exacta sin perderse
+  // Geolocalización nativa para actualizar las coordenadas dinámicamente
   const cargarUbicacionGps = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -104,7 +103,7 @@ export default function MapaPage() {
           });
         },
         (error) => {
-          console.error("Error cargando GPS, usando coordenadas fijas:", error.message);
+          console.error("Error obteniendo ubicación:", error.message);
         },
         { enableHighAccuracy: true }
       );
@@ -117,7 +116,7 @@ export default function MapaPage() {
       setUsuario(JSON.parse(sesionGuardada));
     }
     obtenerReportesEnVivo();
-    cargarUbicacionGps(); // Activa tu GPS automáticamente al entrar
+    cargarUbicacionGps();
   }, []);
 
   const obtenerReportesEnVivo = async () => {
@@ -232,4 +231,11 @@ export default function MapaPage() {
           <button onClick={() => handleCrearAlerta('Operativo')} className="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-blue-50">
             <span className="text-xl mb-1">👮</span><span>Operativo</span>
           </button>
-          <button onClick={() => handleCrearAlerta('Vía Cerrada')} className="flex flex-col items-center justify-center
+          <button onClick={() => handleCrearAlerta('Vía Cerrada')} className="flex flex-col items-center justify-center p-3 border border-gray-200 rounded-lg bg-gray-50 hover:bg-orange-50">
+            <span className="text-xl mb-1">🚧</span><span>Vía cerrada</span>
+          </button>
+        </div>
+      </footer>
+    </div>
+  );
+}
