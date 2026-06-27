@@ -33,7 +33,7 @@ const NODOS_GRAFO: Record<string, { lat: number; lng: number; conexiones: Record
 function resolverDijkstra(inicio: string, fin: string): string[] {
   const distancias: Record<string, number> = {};
   const previos: Record<string, string | null> = {};
-  const nodos Unvisited = new Set<string>();
+  const nodosUnvisited = new Set<string>();
 
   for (let nodo in NODOS_GRAFO) {
     distancias[nodo] = nodo === inicio ? 0 : Infinity;
@@ -76,8 +76,6 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [busqueda, setBusqueda] = useState('universidad continental');
   const [caminoDijkstra, setCaminoDijkstra] = useState<string[]>(["Inicio", "Av_Mariategui", "El_Tambo", "Univ_Continental"]);
-  
-  // Ubicación del GPS dinámico (Huancayo por defecto)
   const [gpsCoords, setGpsCoords] = useState({ lat: -12.0487, lng: -75.2280 });
   const [mapUrl, setMapUrl] = useState('');
 
@@ -89,11 +87,9 @@ export default function MapaPage() {
       setUsuario({ nombre: 'Joaquien', email: 'joaquien@mapflash.com', rol: 'admin' });
     }
     obtenerReportesEnVivo();
-    // Generar mapa inicial conectado automáticamente
     trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
   }, []);
 
-  // Función núcleo: Conecta dinámicamente el origen (GPS) con el destino (Buscador)
   const trazarRutaMapa = (origenLat: number, origenLng: number, destinoTexto: string) => {
     const origenParam = `${origenLat},${origenLng}`;
     const urlSugerida = `https://maps.google.com/maps?q=${origenParam}&saddr=${origenParam}&daddr=${encodeURIComponent(destinoTexto)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
@@ -108,8 +104,7 @@ export default function MapaPage() {
           setGpsCoords(nuevasCoords);
           trazarRutaMapa(nuevasCoords.lat, nuevasCoords.lng, busqueda);
         },
-        (error) => {
-          console.error("Error al obtener GPS, usando posición actual:", error.message);
+        () => {
           trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
         },
         { enableHighAccuracy: true }
@@ -124,10 +119,8 @@ export default function MapaPage() {
   };
 
   const handleCalcularDijkstra = () => {
-    // Calcula la secuencia del autómata lógicamente
     const rutaNodos = resolverDijkstra("Inicio", "Univ_Continental");
     setCaminoDijkstra(rutaNodos);
-    // Refresca la conexión del mapa con el destino solicitado
     trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
   };
 
@@ -174,7 +167,7 @@ export default function MapaPage() {
         </div>
       </header>
       
-      {/* Buscador de Direcciones Conectado */}
+      {/* Buscador de Direcciones */}
       <div className="p-4 bg-[#1c2541] rounded-xl border border-[#3a506b]/30 mb-4 space-y-3 shadow-lg">
         <div className="flex items-center border border-[#3a506b]/50 rounded-md overflow-hidden bg-[#0b1329]">
           <span className="px-3 text-red-500 text-lg">●</span>
@@ -190,14 +183,13 @@ export default function MapaPage() {
 
         {/* Botón de Dijkstra */}
         <button onClick={handleCalcularDijkstra} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-700 transition shadow-sm">
-          Calcular ruta óptima con Dijkstra →
+          Calcular ruta óptma con Dijkstra →
         </button>
       </div>
 
-      {/* Contenedor del Mapa e Interfaz de Estado */}
+      {/* Contenedor del Mapa */}
       <div className="flex-1 bg-[#1c2541] p-4 rounded-xl border border-[#3a506b]/30 mb-4 shadow-xl flex flex-col">
         <div className="flex items-start justify-between mb-3">
-          {/* Botón de Ubicación GPS Activo */}
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 bg-[#111827]/50 px-4 py-2 rounded-full font-medium text-sm border border-[#3a506b]/20">
               <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></span>
@@ -208,7 +200,7 @@ export default function MapaPage() {
             </button>
           </div>
           
-          {/* Panel del Autómata de Dijkstra */}
+          {/* Panel del Autómata */}
           <div className="bg-[#111827]/80 p-4 rounded-xl w-80 shadow-2xl border border-[#3a506b]/30">
             <div className="flex justify-between items-center mb-1">
               <h4 className="font-bold text-xs tracking-wider text-gray-300 uppercase">AUTOMÁTA DIJKSTRA</h4>
@@ -220,15 +212,17 @@ export default function MapaPage() {
           </div>
         </div>
         
-        {/* Iframe del Mapa Conectado y Escalado */}
+        {/* Iframe del Mapa */}
         <div className="w-full flex-1 min-h-[500px] bg-[#0b1329] rounded-xl overflow-hidden shadow-inner border border-[#3a506b]/30 relative">
-          <iframe
-            src={mapUrl}
-            className="absolute inset-0 w-full h-full border-0 filter invert-[90%] hue-rotate-[180deg]"
-            allowFullScreen={true}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          ></iframe>
+          {mapUrl && (
+            <iframe
+              src={mapUrl}
+              className="absolute inset-0 w-full h-full border-0 filter invert-[90%] hue-rotate-[180deg]"
+              allowFullScreen={true}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            ></iframe>
+          )}
         </div>
       </div>
 
