@@ -20,14 +20,12 @@ interface AlertaTrafico {
   estado: string;
 }
 
-// Grafo de nodos para la simulación del autómata de Dijkstra en Huancayo
+// Grafo de nodos genérico para el autómata de Dijkstra (Nombres genéricos de ruta óptima)
 const NODOS_GRAFO: Record<string, { lat: number; lng: number; conexiones: Record<string, number> }> = {
-  "Inicio": { lat: -12.0487, lng: -75.2280, conexiones: { "Av_Mariategui": 1.2, "Av_Ferrocarril": 1.8 } },
-  "Av_Mariategui": { lat: -12.0545, lng: -75.2200, conexiones: { "Inicio": 1.2, "El_Tambo": 1.1 } },
-  "Av_Ferrocarril": { lat: -12.0515, lng: -75.2160, conexiones: { "Inicio": 1.8, "Siglo_XX": 0.7 } },
-  "Siglo_XX": { lat: -12.0535, lng: -75.2120, conexiones: { "Av_Ferrocarril": 0.7, "Univ_Continental": 1.4 } },
-  "El_Tambo": { lat: -12.0500, lng: -75.2100, conexiones: { "Av_Mariategui": 1.1, "Univ_Continental": 0.8 } },
-  "Univ_Continental": { lat: -12.0528, lng: -75.2032, conexiones: { "Siglo_XX": 1.4, "El_Tambo": 0.8 } }
+  "Nodo_A": { lat: -12.0464, lng: -77.0428, conexiones: { "Nodo_B": 1.5, "Nodo_C": 2.2 } },
+  "Nodo_B": { lat: -12.0500, lng: -77.0300, conexiones: { "Nodo_A": 1.5, "Nodo_D": 1.8 } },
+  "Nodo_C": { lat: -12.0600, lng: -77.0400, conexiones: { "Nodo_A": 2.2, "Nodo_D": 1.1 } },
+  "Nodo_D": { lat: -12.0550, lng: -77.0200, conexiones: { "Nodo_B": 1.8, "Nodo_C": 1.1 } }
 };
 
 function resolverDijkstra(inicio: string, fin: string): string[] {
@@ -74,9 +72,11 @@ export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
-  const [busqueda, setBusqueda] = useState('universidad continental');
-  const [caminoDijkstra, setCaminoDijkstra] = useState<string[]>(["Inicio", "Av_Mariategui", "El_Tambo", "Univ_Continental"]);
-  const [gpsCoords, setGpsCoords] = useState({ lat: -12.0487, lng: -75.2280 });
+  
+  // Modificado: Buscador vacío e inicio neutro en Lima (Perú) por privacidad
+  const [busqueda, setBusqueda] = useState('');
+  const [caminoDijkstra, setCaminoDijkstra] = useState<string[]>(["Nodo_A", "Nodo_B", "Nodo_D"]);
+  const [gpsCoords, setGpsCoords] = useState({ lat: -12.0464, lng: -77.0428 });
   const [mapUrl, setMapUrl] = useState('');
 
   useEffect(() => {
@@ -84,15 +84,19 @@ export default function MapaPage() {
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
     } else {
-      setUsuario({ nombre: 'Joaquien', email: 'joaquien@mapflash.com', rol: 'admin' });
+      setUsuario({ nombre: 'Usuario', email: 'usuario@mapflash.com', rol: 'user' });
     }
     obtenerReportesEnVivo();
-    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
+    // Carga inicial del mapa neutra sin rutas privadas expuestas
+    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, '');
   }, []);
 
   const trazarRutaMapa = (origenLat: number, origenLng: number, destinoTexto: string) => {
     const origenParam = `${origenLat},${origenLng}`;
-    const urlSugerida = `https://maps.google.com/maps?q=${origenParam}&saddr=${origenParam}&daddr=${encodeURIComponent(destinoTexto)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+    // Si no busca nada, solo muestra la vista general del mapa en su ubicación actual o de inicio
+    const urlSugerida = destinoTexto.trim() === '' 
+      ? `https://maps.google.com/maps?q=${origenParam}&t=&z=13&ie=UTF8&iwloc=&output=embed`
+      : `https://maps.google.com/maps?q=${origenParam}&saddr=${origenParam}&daddr=${encodeURIComponent(destinoTexto)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
     setMapUrl(urlSugerida);
   };
 
@@ -113,13 +117,11 @@ export default function MapaPage() {
   };
 
   const handleBuscar = () => {
-    if (busqueda.trim() !== '') {
-      trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
-    }
+    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
   };
 
   const handleCalcularDijkstra = () => {
-    const rutaNodos = resolverDijkstra("Inicio", "Univ_Continental");
+    const rutaNodos = resolverDijkstra("Nodo_A", "Nodo_D");
     setCaminoDijkstra(rutaNodos);
     trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
   };
@@ -161,8 +163,8 @@ export default function MapaPage() {
         
         <div className="flex items-center space-x-3 text-sm text-white">
           <div className="flex items-center space-x-1.5 bg-[#111827]/60 px-3 py-1.5 rounded-full shadow-inner border border-[#3a506b]/20">
-            <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">J</span>
-            <span className="font-semibold">{usuario?.nombre || 'Joaquien'}</span>
+            <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">U</span>
+            <span className="font-semibold">{usuario?.nombre || 'Usuario'}</span>
           </div>
         </div>
       </header>
@@ -174,6 +176,7 @@ export default function MapaPage() {
           <input
             type="text"
             className="w-full py-2 px-1 text-sm outline-none bg-transparent text-white font-medium"
+            placeholder="Introduce tu destino (Ej: Plaza de Armas, Lima)..."
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') handleBuscar(); }}
@@ -183,7 +186,7 @@ export default function MapaPage() {
 
         {/* Botón de Dijkstra */}
         <button onClick={handleCalcularDijkstra} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-700 transition shadow-sm">
-          Calcular ruta óptma con Dijkstra →
+          Calcular ruta óptima con Dijkstra →
         </button>
       </div>
 
@@ -193,10 +196,10 @@ export default function MapaPage() {
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 bg-[#111827]/50 px-4 py-2 rounded-full font-medium text-sm border border-[#3a506b]/20">
               <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></span>
-              <span className="text-emerald-400 font-semibold">Sistema GPS Activo ({gpsCoords.lat.toFixed(2)}, {gpsCoords.lng.toFixed(2)})</span>
+              <span className="text-emerald-400 font-semibold">Ubicación de red activa ({gpsCoords.lat.toFixed(2)}, {gpsCoords.lng.toFixed(2)})</span>
             </div>
             <button onClick={cargarUbicacionGps} className="bg-[#0b1329] border border-[#3a506b]/50 text-xs px-4 py-2 rounded-full text-gray-300 hover:text-white transition font-medium">
-              📍 Activar mi Ubicación
+              📍 Localizar mi Posición
             </button>
           </div>
           
