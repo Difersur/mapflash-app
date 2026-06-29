@@ -155,7 +155,7 @@ export default function MapaPage() {
         }
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, () => {
-        setUrlMapa(`https://maps.google.com/maps?q=Peru&z=6&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=-12.0464,-77.0428&z=13&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -224,7 +224,6 @@ export default function MapaPage() {
       setUsuario(usuarioActualizado);
       localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
       
-      // CAMBIO CLAVE AQUÍ: Primero apagamos la carga para reactivar la UI
       setCargandoBilletera(false);
       alert("¡Billetera digital sincronizada con éxito! 📱");
     } catch (err) {
@@ -645,86 +644,112 @@ export default function MapaPage() {
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">Distancia Estimada</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
 
-        {/* INTERACTIVO DE RUTAS ALTERNATIVAS */}
-        {rutasAlternativas.length > 0 && !mostrarPanelOpciones && (
-          <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">¼️ Rutas sugeridas encontradas:</span>
-            <div className="flex flex-col gap-2 mt-1">
-              {rutasAlternativas.map((ruta, idx) => (
-                <div 
-                  key={idx}
-                  onClick={() => cambiarRutaEspecifica(idx, ruta)}
-                  className={`p-3 rounded-xl border cursor-pointer transition relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 ${rutaSeleccionadaIndex === idx ? 'bg-blue-600/10 border-blue-500 text-white' : 'bg-slate-950 border-slate-800 hover:bg-slate-800 text-slate-300'}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{idx === 0 ? '🚗' : '🛣️'}</span>
-                    <div>
-                      <span className="block text-xs font-bold text-slate-100">{ruta.nombreVia}</span>
-                      <span className="block text-[11px] text-slate-400 mt-0.5">{ruta.detalles}</span>
-                    </div>
-                  </div>
-                  <div className="text-right flex sm:flex-col gap-2 sm:gap-0 items-center sm:items-end w-full sm:w-auto border-t sm:border-0 border-slate-800 pt-2 sm:pt-0">
-                    <span className="text-xs font-bold text-amber-400">{ruta.tiempo}</span>
-                    <span className="text-[11px] text-blue-400 font-mono">{ruta.distancia}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ENLACES RÁPIDOS */}
-        {rutaActiva.length > 0 && !mostrarPanelOpciones && (
-          <div className="bg-slate-900 border border-blue-500/20 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <a 
-                href={`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestinoActual || encodeURIComponent(rutaActiva[1])}&travelmode=driving`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between bg-slate-950 hover:bg-blue-600/10 border border-slate-800 hover:border-blue-500/40 p-3 rounded-xl transition text-left cursor-pointer group"
-              >
-                <div>
-                  <span className="block text-xs font-bold text-slate-200 group-hover:text-blue-400">Lanzar indicaciones GPS</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">Abrir en tu app nativa de mapas</span>
-                </div>
-                <span className="text-sm">🚀</span>
-              </a>
-              <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl flex flex-col justify-center">
-                <span className="block text-xs font-bold text-slate-300">Monitoreo de Red</span>
-                <span className="block text-[10px] text-emerald-400 mt-0.5">🟢 Buscando rutas alternas óptimas en territorio de {regionActual}.</span>
+        {/* SECCIÓN PRINCIPAL: MAPA + RUTAS ALTERNATIVAS + REPORTES */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+          
+          {/* COLUMNA MAPA (Ocupa 3/4) */}
+          <div className="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-[500px] relative">
+            {urlMapa ? (
+              <iframe 
+                title="Visor Cartográfico MapFlash"
+                src={urlMapa}
+                className="w-full flex-1 border-0 invert-[0.9] hue-rotate-180 contrast-[1.1]"
+                allowFullScreen
+                loading="lazy"
+              />
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-slate-500 bg-slate-950">
+                <span className="text-2xl animate-spin">🔄</span>
+                <span className="text-xs font-mono">Esperando autorización satelital GPS...</span>
               </div>
-            </div>
+            )}
+
+            {/* BOTÓN FLOTANTE LOCALIZAR */}
+            <button 
+              type="button" 
+              onClick={localizarMiPosicion} 
+              className="absolute bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white font-bold p-3 rounded-xl shadow-lg transition flex items-center gap-2 text-xs z-20 cursor-pointer"
+            >
+              🎯 Centrar en mi Ubicación GPS
+            </button>
           </div>
-        )}
 
-        {/* CONTROLES */}
-        <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-          <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Localizado en: {regionActual}
-          </span>
-          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition">📍 Centrar en mi GPS</button>
-        </div>
+          {/* COLUMNA REPORTES Y PASARELAS ALTERNATIVAS (Ocupa 1/4) */}
+          <div className="flex flex-col gap-4">
+            
+            {/* PANEL DE RUTAS ALTERNATIVAS */}
+            {rutasAlternativas.length > 0 && (
+              <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">🛣️ Vías Alternas del MTC:</span>
+                <div className="flex flex-col gap-2">
+                  {rutasAlternativas.map((ruta, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => cambiarRutaEspecifica(idx, ruta)}
+                      className={`w-full p-3 rounded-xl text-left border transition text-xs flex flex-col gap-1 cursor-pointer ${rutaSeleccionadaIndex === idx ? 'bg-blue-600/20 border-blue-500 text-white' : 'bg-slate-950 border-slate-800 hover:bg-slate-800 text-slate-300'}`}
+                    >
+                      <div className="flex justify-between font-bold w-full">
+                        <span>{ruta.nombreVia}</span>
+                        <span className="text-amber-400 font-mono">{ruta.tiempo}</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 leading-normal">{ruta.detalles} ({ruta.distancia})</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* MAPA VISOR */}
-        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[440px] z-20">
-          {urlMapa ? (
-            <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Cargando visor nacional...</div>
-          )}
-        </div>
+            {/* BOTONES DE ALERTA RÁPIDA (REPORTES EN VIVO) */}
+            <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">📢 Reportar Incidente Vial:</span>
+              <div className="grid grid-cols-2 gap-2">
+                <button 
+                  type="button" 
+                  disabled={cargandoAlerta} 
+                  onClick={() => handleCreateAlerta('Tráfico Pesado')} 
+                  className="bg-amber-600/10 hover:bg-amber-600 hover:text-slate-950 text-amber-400 border border-amber-600/30 font-bold p-3 rounded-xl text-xs transition cursor-pointer flex flex-col items-center gap-1.5"
+                >
+                  🚗 <span>Tráfico</span>
+                </button>
+                <button 
+                  type="button" 
+                  disabled={cargandoAlerta} 
+                  onClick={() => handleCreateAlerta('Accidente')} 
+                  className="bg-rose-600/10 hover:bg-rose-600 hover:text-white text-rose-400 border border-rose-600/30 font-bold p-3 rounded-xl text-xs transition cursor-pointer flex flex-col items-center gap-1.5"
+                >
+                  💥 <span>Accidente</span>
+                </button>
+                <button 
+                  type="button" 
+                  disabled={cargandoAlerta} 
+                  onClick={() => handleCreateAlerta('Clausura/Obras')} 
+                  className="bg-purple-600/10 hover:bg-purple-600 hover:text-white text-purple-400 border border-purple-600/30 font-bold p-3 rounded-xl text-xs transition cursor-pointer flex flex-col items-center gap-1.5"
+                >
+                  🚧 <span>Obras</span>
+                </button>
+                <button 
+                  type="button" 
+                  disabled={cargandoAlerta} 
+                  onClick={() => handleCreateAlerta('Policía/Control')} 
+                  className="bg-blue-600/10 hover:bg-blue-600 hover:text-white text-blue-400 border border-blue-600/30 font-bold p-3 rounded-xl text-xs transition cursor-pointer flex flex-col items-center gap-1.5"
+                >
+                  👮 <span>Control</span>
+                </button>
+              </div>
+              {!usuario && (
+                <span className="text-[10px] text-center text-slate-500 italic block mt-1">⚠️ Requiere inicio de sesión activo para sincronizar con la red de Supabase.</span>
+              )}
+            </div>
 
-        {/* BOTONES DE INCIDENTES */}
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">REPORTAR TRÁFICO O INCIDENTE LOCAL</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button onClick={() => handleCreateAlerta('Accidente')} disabled={cargandoAlerta} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition">🚨 Accidente</button>
-            <button onClick={() => handleCreateAlerta('Tráfico')} disabled={cargandoAlerta} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition">🚗 Tráfico</button>
-            <button onClick={() => handleCreateAlerta('Operativo')} disabled={cargandoAlerta} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition">👮 Operativo</button>
-            <button onClick={() => handleCreateAlerta('Vía Cerrada')} disabled={cargandoAlerta} className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition">🚧 Vía Cerrada</button>
           </div>
         </div>
       </main>
+
+      {/* FOOTER */}
+      <footer className="border-t border-slate-800 bg-slate-950 p-4 text-center text-[11px] text-slate-500 relative z-10">
+        MapFlash Perú v4.2 • Algoritmo de Enrutamiento Dinámico con Base de Datos Descentralizada en Tiempo Real © 2026.
+      </footer>
     </div>
   );
 }
