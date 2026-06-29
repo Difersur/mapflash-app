@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -10,6 +11,7 @@ interface UsuarioSesion {
   nombre: string;
   email: string;
   rol: string;
+  avatar_url?: string;
 }
 
 interface AlertaTrafico {
@@ -20,234 +22,216 @@ interface AlertaTrafico {
   estado: string;
 }
 
-// Grafo de nodos genérico para el autómata de Dijkstra
-const NODOS_GRAFO: Record<string, { lat: number; lng: number; conexiones: Record<string, number> }> = {
-  "Nodo_A": { lat: -12.0464, lng: -77.0428, conexiones: { "Nodo_B": 1.5, "Nodo_C": 2.2 } },
-  "Nodo_B": { lat: -12.0500, lng: -77.0300, conexiones: { "Nodo_A": 1.5, "Nodo_D": 1.8 } },
-  "Nodo_C": { lat: -12.0600, lng: -77.0400, conexiones: { "Nodo_A": 2.2, "Nodo_D": 1.1 } },
-  "Nodo_D": { lat: -12.0550, lng: -77.0200, conexiones: { "Nodo_B": 1.8, "Nodo_C": 1.1 } }
-};
-
-function resolverDijkstra(inicio: string, fin: string): string[] {
-  const distancias: Record<string, number> = {};
-  const previos: Record<string, string | null> = {};
-  const nodosUnvisited = new Set<string>();
-
-  for (let nodo in NODOS_GRAFO) {
-    distancias[nodo] = nodo === inicio ? 0 : Infinity;
-    previos[nodo] = null;
-    nodosUnvisited.add(nodo);
-  }
-
-  while (nodosUnvisited.size > 0) {
-    let nodoActual = Array.from(nodosUnvisited).reduce((minNodo, nodo) => 
-      distancias[nodo] < distancias[minNodo] ? nodo : minNodo, Array.from(nodosUnvisited)[0]
-    );
-
-    if (distancias[nodoActual] === Infinity || nodoActual === fin) break;
-    nodosUnvisited.delete(nodoActual);
-
-    const conexiones = NODOS_GRAFO[nodoActual].conexiones;
-    for (let vecino in conexiones) {
-      if (nodosUnvisited.has(vecino)) {
-        let alt = distancias[nodoActual] + conexiones[vecino];
-        if (alt < distancias[vecino]) {
-          distancias[vecino] = alt;
-          previos[vecino] = nodoActual;
-        }
-      }
-    }
-  }
-
-  const ruta: string[] = [];
-  let u: string | null = fin;
-  while (u !== null) {
-    ruta.unshift(u);
-    u = previos[u];
-  }
-  return ruta;
-}
-
 export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   
-  const [busqueda, setBusqueda] = useState('');
-  const [caminoDijkstra, setCaminoDijkstra] = useState<string[]>(["Nodo_A", "Nodo_B", "Nodo_D"]);
-  // Coordenadas de inicio neutras (Lima) hasta que el usuario decida activar su GPS real
-  const [gpsCoords, setGpsCoords] = useState({ lat: -12.0464, lng: -77.0428 });
-  const [mapUrl, setMapUrl] = useState('');
+  // Coordenadas iniciales por defecto en Huancayo, Perú
+  const [centroMapa, setCentroMapa] = useState({
+    lat: -12.06513, 
+    lng: -75.20486,
+    zoom: 14 
+  });
 
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
-    } else {
-      setUsuario({ nombre: 'Usuario', email: 'usuario@mapflash.com', rol: 'user' });
     }
     obtenerReportesEnVivo();
-    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, '');
   }, []);
 
-  const trazarRutaMapa = (origenLat: number, origenLng: number, destinoTexto: string) => {
-    const origenParam = `${origenLat},${origenLng}`;
-    const urlSugerida = destinoTexto.trim() === '' 
-      ? `https://maps.google.com/maps?q=${origenParam}&t=&z=14&ie=UTF8&iwloc=&output=embed`
-      : `https://maps.google.com/maps?q=${origenParam}&saddr=${origenParam}&daddr=${encodeURIComponent(destinoTexto)}&t=&z=14&ie=UTF8&iwloc=&output=embed`;
-    setMapUrl(urlSugerida);
-  };
-
-  // Esta función obtiene la ubicación real del dispositivo en vivo al hacer clic
-  const cargarUbicacionGps = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const nuevasCoords = { lat: position.coords.latitude, lng: position.coords.longitude };
-          setGpsCoords(nuevasCoords);
-          // Actualiza el mapa dinámicamente con la ubicación real del usuario
-          trazarRutaMapa(nuevasCoords.lat, nuevasCoords.lng, busqueda);
-        },
-        () => {
-          // Si el usuario deniega el permiso, se mantiene la vista previa actual
-          trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
-        },
-        { enableHighAccuracy: true }
-      );
-    }
-  };
-
-  const handleBuscar = () => {
-    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
-  };
-
-  const handleCalcularDijkstra = () => {
-    const rutaNodos = resolverDijkstra("Nodo_A", "Nodo_D");
-    setCaminoDijkstra(rutaNodos);
-    trazarRutaMapa(gpsCoords.lat, gpsCoords.lng, busqueda);
-  };
-
   const obtenerReportesEnVivo = async () => {
-    const { data, error } = await supabase.from('alertas_trafico').select('*').eq('estado', 'activo');
+    const { data, error } = await supabase
+      .from('alertas_trafico')
+      .select('*')
+      .eq('estado', 'activo');
+
     if (data) setReportes(data);
-    if (error) console.error(error.message);
+    if (error) console.error("Error cargando alertas:", error.message);
+  };
+
+  const handleCerrarSesion = () => {
+    localStorage.removeItem('usuario_mapflash');
+    window.location.href = '/';
+  };
+
+  const getEmojiRol = (rol: string) => {
+    const r = rol ? rol.toLowerCase() : '';
+    if (r === 'admin') return '👑';
+    if (r === 'entrega') return '📦';
+    return '👤';
   };
 
   const handleCrearAlerta = async (tipo: string) => {
-    if (!usuario) return;
+    if (!usuario) {
+      alert("Debes iniciar sesión para reportar incidentes.");
+      return;
+    }
     setCargandoAlerta(true);
+    
+    let lat = -12.06513;
+    let lng = -75.20486;
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          lat = position.coords.latitude;
+          lng = position.coords.longitude;
+          setCentroMapa({ lat, lng, zoom: 16 }); 
+          await guardarAlerta(tipo, lat, lng);
+        },
+        async () => {
+          await guardarAlerta(tipo, lat, lng);
+        }
+      );
+    } else {
+      await guardarAlerta(tipo, lat, lng);
+    }
+  };
+
+  const guardarAlerta = async (tipo: string, lat: number, lng: number) => {
     try {
-      const { error } = await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: gpsCoords.lat, longitud: gpsCoords.lng, estado: 'activo' }]);
-      if (!error) obtenerReportesEnVivo();
-    } catch (e) {
-      console.error(e);
+      const { error } = await supabase
+        .from('alertas_trafico')
+        .insert([{ tipo_reporte: tipo, latitud: lat, longitud: lng, estado: 'activo' }]);
+
+      if (error) throw error;
+      alert(`¡Alerta de ${tipo} registrada con éxito!`);
+      obtenerReportesEnVivo();
+    } catch (err: any) {
+      alert("No se pudo registrar el reporte: " + err.message);
     } finally {
       setCargandoAlerta(false);
     }
   };
 
+  const irAUbicacion = (lat: number, lng: number) => {
+    setCentroMapa({ lat, lng, zoom: 17 }); 
+  };
+
   return (
-    <div className="min-h-screen bg-[#0b1329] flex flex-col text-white font-sans select-none p-4">
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between">
       
-      {/* Header Superior */}
-      <header className="bg-[#1c2541] border border-[#3a506b]/30 px-4 py-3 flex items-center justify-between shadow-lg rounded-t-xl mb-4">
-        <div className="flex items-center space-x-4">
-          <span className="text-white font-bold text-lg flex items-center">← MapFlash</span>
-          <h1 className="text-gray-300 font-medium text-sm border-l pl-4 border-[#3a506b]/40">Mapa Nacional del Perú</h1>
-        </div>
-        
-        <div className="flex items-center space-x-2 bg-[#111827]/50 px-3 py-1.5 rounded-full font-medium text-sm border border-[#3a506b]/20">
-          <span className="text-orange-500">🔥</span>
-          <span className="text-emerald-400 font-semibold">{reportes.length}</span>
-          <span className="text-gray-300 font-medium">Alertas activas</span>
-        </div>
-        
-        <div className="flex items-center space-x-3 text-sm text-white">
-          <div className="flex items-center space-x-1.5 bg-[#111827]/60 px-3 py-1.5 rounded-full shadow-inner border border-[#3a506b]/20">
-            <span className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">U</span>
-            <span className="font-semibold">{usuario?.nombre || 'Usuario'}</span>
-          </div>
-        </div>
-      </header>
-      
-      {/* Buscador de Direcciones */}
-      <div className="p-4 bg-[#1c2541] rounded-xl border border-[#3a506b]/30 mb-4 space-y-3 shadow-lg">
-        <div className="flex items-center border border-[#3a506b]/50 rounded-md overflow-hidden bg-[#0b1329]">
-          <span className="px-3 text-red-500 text-lg">●</span>
-          <input
-            type="text"
-            className="w-full py-2 px-1 text-sm outline-none bg-transparent text-white font-medium"
-            placeholder="Introduce tu destino y presiona Buscar..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleBuscar(); }}
-          />
-          <button onClick={handleBuscar} className="bg-blue-600 text-white px-6 py-2 text-sm font-medium hover:bg-blue-700 transition">Buscar</button>
+      {/* Barra de Navegación Superior */}
+      <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md">
+        <div className="flex items-center gap-4">
+          <Link href="/" className="text-sm text-slate-400 hover:text-white transition">
+            ← MapFlash
+          </Link>
+          <h1 className="text-lg font-bold text-white tracking-tight">Mapa de Huancayo</h1>
         </div>
 
-        {/* Botón de Dijkstra */}
-        <button onClick={handleCalcularDijkstra} className="w-full bg-emerald-600 text-white font-semibold py-2.5 rounded-md text-sm hover:bg-emerald-700 transition shadow-sm">
-          Calcular ruta óptma con Dijkstra →
-        </button>
-      </div>
-
-      {/* Contenedor del Mapa */}
-      <div className="flex-1 bg-[#1c2541] p-4 rounded-xl border border-[#3a506b]/30 mb-4 shadow-xl flex flex-col">
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 bg-[#111827]/50 px-4 py-2 rounded-full font-medium text-sm border border-[#3a506b]/20">
-              <span className="w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse"></span>
-              <span className="text-emerald-400 font-semibold">Ubicación GPS ({gpsCoords.lat.toFixed(2)}, {gpsCoords.lng.toFixed(2)})</span>
-            </div>
-            <button onClick={cargarUbicacionGps} className="bg-[#0b1329] border border-[#3a506b]/50 text-xs px-4 py-2 rounded-full text-gray-300 hover:text-white transition font-medium">
-              📍 Localizar mi Posición
-            </button>
-          </div>
+        <div className="flex items-center gap-3">
+          <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
+            🔥 {reportes.length} Alertas activas
+          </span>
           
-          {/* Panel del Autómata */}
-          <div className="bg-[#111827]/80 p-4 rounded-xl w-80 shadow-2xl border border-[#3a506b]/30">
-            <div className="flex justify-between items-center mb-1">
-              <h4 className="font-bold text-xs tracking-wider text-gray-300 uppercase">AUTOMÁTA DIJKSTRA</h4>
-              <span className="text-emerald-400 font-bold text-xs">EN VIVO</span>
+          {/* PARTE RESTAURADA: Ahora el botón del usuario vuelve a ser un enlace clickeable a tu página de perfil */}
+          {usuario ? (
+            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+              <Link 
+                href="/perfil" 
+                className="text-xs font-semibold text-slate-200 hover:text-blue-400 transition flex items-center gap-1"
+                title="Ver mi Perfil y Agregar Fotos"
+              >
+                {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
+              </Link>
+              <button 
+                onClick={handleCerrarSesion}
+                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs"
+                title="Cerrar Sesión"
+              >
+                ✕
+              </button>
             </div>
-            <div className="text-gray-400 font-medium text-xs break-words">
-              Camino: {caminoDijkstra.join(' ➔ ')}
-            </div>
-          </div>
-        </div>
-        
-        {/* Iframe del Mapa */}
-        <div className="w-full flex-1 min-h-[500px] bg-[#0b1329] rounded-xl overflow-hidden shadow-inner border border-[#3a506b]/30 relative">
-          {mapUrl && (
-            <iframe
-              src={mapUrl}
-              className="absolute inset-0 w-full h-full border-0 filter invert-[90%] hue-rotate-[180deg]"
-              allowFullScreen={true}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-            ></iframe>
+          ) : (
+            <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">
+              Iniciar Sesión
+            </Link>
           )}
         </div>
-      </div>
+      </header>
 
-      {/* Alertas Inferiores */}
-      <footer className="bg-[#1c2541] p-4 border border-[#3a506b]/30 rounded-xl shadow-xl">
-        <span className="text-xs text-gray-400 block mb-4 font-bold uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO EN TU POSICIÓN ACTUAL</span>
-        <div className="grid grid-cols-4 gap-4 text-xs font-semibold text-white">
-          <button onClick={() => handleCrearAlerta('Accidente')} className="flex flex-col items-center justify-center p-5 border border-[#3a506b]/20 rounded-xl bg-[#0b1329]/50 hover:bg-red-950/30 transition-all shadow-md">
-            <span className="text-3xl mb-2">🚨</span><span className="text-red-400">Accidente</span>
-          </button>
-          <button onClick={() => handleCrearAlerta('Tráfico')} className="flex flex-col items-center justify-center p-5 border border-[#3a506b]/20 rounded-xl bg-[#0b1329]/50 hover:bg-orange-950/30 transition-all shadow-md">
-            <span className="text-3xl mb-2">🚗</span><span className="text-orange-400">Tráfico</span>
-          </button>
-          <button onClick={() => handleCrearAlerta('Operativo')} className="flex flex-col items-center justify-center p-5 border border-[#3a506b]/20 rounded-xl bg-[#0b1329]/50 hover:bg-blue-950/30 transition-all shadow-md">
-            <span className="text-3xl mb-2">👮</span><span className="text-blue-400">Operativo</span>
-          </button>
-          <button onClick={() => handleCrearAlerta('Vía Cerrada')} className="flex flex-col items-center justify-center p-5 border border-[#3a506b]/20 rounded-xl bg-[#0b1329]/50 hover:bg-yellow-950/30 transition-all shadow-md">
-            <span className="text-3xl mb-2">🚧</span><span className="text-yellow-400">Vía Cerrada</span>
-          </button>
+      {/* Contenedor Principal del Mapa */}
+      <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
+        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900">
+          
+          {/* MAPA DINÁMICO */}
+          <iframe
+            src={`http://googleusercontent.com/maps.google.com/6{centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
+            className="w-full h-full border-0 absolute inset-0"
+            allowFullScreen={true}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          ></iframe>
+
+          {/* Estado del Sistema flotante */}
+          <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700 shadow-lg flex items-center gap-2 z-10">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+            <span className="text-xs font-semibold text-slate-200">GPS Activo · Huancayo</span>
+          </div>
+
+          {/* Panel de reportes rápidos en la zona */}
+          <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en la Incontrastable</h3>
+            <div className="max-h-48 overflow-y-auto flex flex-col gap-2">
+              {reportes.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
+              ) : (
+                reportes.map((r) => (
+                  <div 
+                    key={r.id} 
+                    onClick={() => irAUbicacion(r.latitud, r.longitud)}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-slate-700 flex justify-between items-center cursor-pointer transition active:scale-95"
+                    title="Clic para viajar a la alerta"
+                  >
+                    <span className="capitalize text-slate-200 font-medium">⚠️ {r.tipo_reporte}</span>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">Ver</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
         </div>
-      </footer>
+
+        {/* Panel Inferior para Reportar Incidentes */}
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Alertar Incidentes de Tránsito</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button
+              onClick={() => handleCrearAlerta('Accidente')}
+              disabled={cargandoAlerta}
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚨 Accidente
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Tráfico')}
+              disabled={cargandoAlerta}
+              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚗 Tráfico
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Operativo')}
+              disabled={cargandoAlerta}
+              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              👮 Operativo
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Vía Cerrada')}
+              disabled={cargandoAlerta}
+              className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚧 Vía Cerrada
+            </button>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
