@@ -89,16 +89,15 @@ export default function MapaPage() {
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
     } else {
-      // Dejar los datos reflejados en tu captura para pruebas consistentes
+      // COLOCAMOS UNA FOTO POR DEFECTO PARA QUE SE VISUALICE CORRECTAMENTE SIEMPRE
       setUsuario({
         nombre: "Joaquien",
         email: "Acc2Prueba@gmail.com",
         rol: "conductor",
-        avatar_url: "" 
+        avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien" 
       });
     }
     
-    // Cerrar menú al hacer clic afuera
     function manejarClicAfuera(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuAbierto(false);
@@ -305,7 +304,7 @@ export default function MapaPage() {
                 onClick={() => setMenuAbierto(!menuAbierto)}
                 className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
               >
-                <div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500 flex items-center justify-center overflow-hidden">
+                <div className="w-6 h-6 rounded-full bg-slate-700 border border-blue-500 flex items-center justify-center overflow-hidden">
                   {usuario.avatar_url ? (
                     <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -316,12 +315,16 @@ export default function MapaPage() {
                 <span className="text-[10px] text-slate-400 transition-transform duration-200 block" style={{ transform: menuAbierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
               </div>
 
-              {/* MENU DESPLEGABLE INTEGRADITO (TARJETA VISUAL DE PERFIL) */}
+              {/* Tarjeta Desplegable de Perfil */}
               {menuAbierto && (
-                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-150 z-[100]">
+                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 z-[100]">
                   <div className="flex items-center gap-3 border-b border-slate-700/60 pb-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500 flex items-center justify-center text-sm font-bold text-blue-400">
-                      {usuario.avatar_url ? <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : usuario.nombre.charAt(0).toUpperCase()}
+                    <div className="w-10 h-10 rounded-full bg-slate-700 border border-blue-500 flex items-center justify-center overflow-hidden">
+                      {usuario.avatar_url ? (
+                        <img src={usuario.avatar_url} alt="Avatar Grande" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-sm font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
                     <div className="overflow-hidden">
                       <h4 className="text-sm font-bold text-white truncate">{usuario.nombre}</h4>
@@ -392,7 +395,7 @@ export default function MapaPage() {
           </button>
         </div>
 
-        {/* Mapa de Google Restablecido */}
+        {/* Mapa */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[480px] z-20">
           <iframe
             src={urlMapa}
