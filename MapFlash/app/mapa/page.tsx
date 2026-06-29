@@ -50,7 +50,11 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed');
+  
+  // URL Inicial apuntando a Huancayo usando la API Embed oficial de Google
+  const [urlMapa, setUrlMapa] = useState<string>(
+    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed'
+  );
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -205,7 +209,7 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } finaly {
+      } finally {
         setCargandoAlerta(false);
       }
     };
