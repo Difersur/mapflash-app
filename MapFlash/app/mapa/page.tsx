@@ -22,17 +22,35 @@ interface AlertaTrafico {
   estado: string;
 }
 
+// Interfaz estricta para los nodos del grafo (Soporta nivel nacional/mundial)
+interface NodoGrafo {
+  lat: number;
+  lng: number;
+  conexiones: Record<string, number>;
+}
+
 export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
+  
+  // Estado para reflejar el camino óptimo del autómata Dijkstra
+  const [caminoCalculado, setCaminoCalculado] = useState<string>('Camino: Nodo_A → Nodo_B → Nodo_D');
 
-  // Ubicación por defecto que tenías para tu mapa
+  // Ubicación dinámica en el mapa (Nacional / Mundial)
   const [centroMapa, setCentroMapa] = useState({
-    lat: -12.06, 
-    lng: -75.21,
-    zoom: 14 
+    lat: -12.05, 
+    lng: -77.04,
+    zoom: 13 
+  });
+
+  // Tu Grafo cargado en el estado (Páralo o llénalo dinámicamente según tus ubicaciones nacionales o mundiales)
+  const [grafoNodos, setGrafoNodos] = useState<Record<string, NodoGrafo>>({
+    // Aquí van tus nodos cargados. Ejemplo de estructura:
+    "Nodo_A": { lat: -12.05, lng: -77.04, conexiones: { "Nodo_B": 5 } },
+    "Nodo_B": { lat: -12.06, lng: -75.21, conexiones: { "Nodo_A": 5, "Nodo_D": 3 } },
+    "Nodo_D": { lat: -12.07, lng: -75.22, conexiones: { "Nodo_B": 3 } }
   });
 
   useEffect(() => {
@@ -82,55 +100,85 @@ export default function MapaPage() {
     }
   };
 
-  const handleCrearAlerta = async (tipo: string) => {
-    if (!usuario) {
-      alert("Debes iniciar sesión para reportar incidentes.");
+  // Algoritmo Dijkstra con tipado estricto para evitar errores en Vercel
+  const ejecutarDijkstra = (inicio: string, fin: string) => {
+    if (!grafoNodos[inicio] || !grafoNodos[fin]) {
+      alert("Nodos origen o destino no válidos en el grafo global.");
       return;
     }
-    setCargandoAlerta(true);
-    
-    let lat = centroMapa.lat;
-    let lng = centroMapa.lng;
 
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          lat = position.coords.latitude;
-          lng = position.coords.longitude;
-          setCentroMapa({ lat, lng, zoom: 16 }); 
-          await guardarAlerta(tipo, lat, lng);
-        },
-        async () => {
-          await guardarAlerta(tipo, lat, lng);
+    const distancias: Record<string, number> = {};
+    const previos: Record<string, string | null> = {};
+    const visitados = new Set<string>();
+
+    Object.keys(grafoNodos).forEach(nodo => {
+      distancias[nodo] = Infinity;
+      previos[nodo] = null;
+    });
+    distancias[inicio] = 0;
+
+    while (visitados.size < Object.keys(grafoNodos).length) {
+      let nodoActual: string | null = null;
+      let distanciaMinima = Infinity;
+
+      Object.keys(grafoNodos).forEach(nodo => {
+        if (!visitados.has(nodo) && distancias[nodo] < distanciaMinima) {
+          distanciaMinima = distancias[nodo];
+          nodoActual = nodo;
         }
-      );
-    } else {
-      await guardarAlerta(tipo, lat, lng);
+      });
+
+      if (nodoActual === null || nodoActual === fin) break;
+      visitados.add(nodoActual);
+
+      const conexiones = grafoNodos[nodoActual as string].conexiones;
+      Object.keys(conexiones).forEach(vecino => {
+        const alt = distancias[nodoActual as string] + conexiones[vecino];
+        if (alt < distancias[vecino]) {
+          distancias[vecino] = alt;
+          previos[vecino] = nodoActual;
+        }
+      });
     }
-  };
 
-  const guardarAlerta = async (tipo: string, lat: number, lng: number) => {
-    try {
-      const { error } = await supabase
-        .from('alertas_trafico')
-        .insert([{ tipo_reporte: tipo, latitud: lat, longitud: lng, estado: 'activo' }]);
-
-      if (error) throw error;
-      alert(`¡Alerta de ${tipo} registrada con éxito!`);
-      obtenerReportesEnVivo();
-    } catch (err: any) {
-      alert("No se pudo registrar el reporte: " + err.message);
-    } finally {
-      setCargandoAlerta(false);
+    const camino: string[] = [];
+    let paso: string | null = fin;
+    while (paso) {
+      camino.unshift(paso);
+      paso = previos[paso];
     }
-  };
 
-  const irAUbicacion = (lat: number, lng: number) => {
-    setCentroMapa({ lat, lng, zoom: 17 }); 
+    setCaminoCalculado(`Camino: ${camino.join(' → ')}`);
+    
+    // Mover de inmediato el mapa al nodo destino calculado
+    setCentroMapa({
+      lat: grafoNodos[fin].lat,
+      lng: grafoNodos[fin].lng,
+      zoom: 15
+    });
   };
 
   const handleBuscarDestino = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!destino) return;
+
+    // Buscar si el destino escrito coincide con alguna clave de tu grafo nacional/mundial
+    const nodoEncontrado = Object.keys(grafoNodos).find(n => 
+      n.toLowerCase().includes(destino.toLowerCase())
+    );
+
+    if (nodoEncontrado) {
+      const nodo = grafoNodos[nodoEncontrado];
+      setCentroMapa({
+        lat: nodo.lat,
+        lng: nodo.lng,
+        zoom: 15
+      });
+      // Tomamos "Nodo_A" como origen de ejemplo global, o cámbialo por tu nodo actual
+      ejecutarDijkstra("Nodo_A", nodoEncontrado);
+    } else {
+      alert("El destino no corresponde a ningún nodo registrado en el grafo.");
+    }
   };
 
   return (
@@ -142,7 +190,7 @@ export default function MapaPage() {
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">
             ← MapFlash
           </Link>
-          <h1 className="text-lg font-bold text-white tracking-tight">Mapa de Huancayo</h1>
+          <h1 className="text-lg font-bold text-white tracking-tight">Mapa Nacional del Perú</h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -150,42 +198,20 @@ export default function MapaPage() {
             🔥 {reportes.length} Alertas activas
           </span>
           
-          {usuario ? (
+          {usuario && (
             <div className="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
-              <Link 
-                href="/perfil" 
-                className="flex flex-col items-end gap-1 group"
-                title="Ver mi Perfil y Agregar Fotos"
-              >
-                <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-400 transition flex items-center gap-1">
-                  {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
-                </span>
-                
-                {usuario.avatar_url ? (
-                  <img 
-                    src={usuario.avatar_url} 
-                    alt="Miniatura de perfil" 
-                    className="w-6 h-6 rounded-full object-cover border border-slate-600 shadow group-hover:border-blue-400 transition"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] border border-slate-600 group-hover:border-blue-400 transition">
-                    {getEmojiRol(usuario.rol)}
-                  </div>
-                )}
-              </Link>
-
-              <button 
-                onClick={handleCerrarSesion}
-                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs"
-                title="Cerrar Sesión"
-              >
-                ✕
-              </button>
+              <span className="text-xs font-semibold text-slate-200">
+                {getEmojiRol(usuario.rol)} {usuario.nombre}
+              </span>
+              {usuario.avatar_url && (
+                <img 
+                  src={usuario.avatar_url} 
+                  alt="Miniatura" 
+                  className="w-6 h-6 rounded-full object-cover border border-slate-600 shadow"
+                />
+              )}
+              <button onClick={handleCerrarSesion} className="text-slate-400 hover:text-rose-400 transition font-bold text-xs">✕</button>
             </div>
-          ) : (
-            <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">
-              Iniciar Sesión
-            </Link>
           )}
         </div>
       </header>
@@ -211,7 +237,11 @@ export default function MapaPage() {
             </button>
           </form>
           
-          <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition active:scale-95 text-center">
+          <button 
+            type="button"
+            onClick={() => ejecutarDijkstra("Nodo_A", Object.keys(grafoNodos).find(n => n.toLowerCase().includes(destino.toLowerCase())) || "Nodo_D")}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition active:scale-95 text-center"
+          >
             Calcular ruta óptma con Dijkstra →
           </button>
         </div>
@@ -235,7 +265,7 @@ export default function MapaPage() {
           <div className="bg-slate-950/80 border border-slate-800 p-2 rounded-xl text-right flex items-center justify-between sm:justify-end gap-4">
             <div className="text-left sm:text-right">
               <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">AUTOMÁTA DIJKSTRA</span>
-              <span className="text-xs text-slate-300 font-mono">Camino: Nodo_A → Nodo_B → Nodo_D</span>
+              <span className="text-xs text-slate-300 font-mono">{caminoCalculado}</span>
             </div>
             <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase tracking-widest font-extrabold px-2 py-0.5 rounded-md">
               EN VIVO
@@ -243,75 +273,15 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Contenedor del Mapa Físico */}
+        {/* Contenedor del Mapa Físico (Renderiza cualquier coordenada mundial) */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           <iframe
-            src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
+            src={`http://googleusercontent.com/maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen={true}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           ></iframe>
-
-          <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700 shadow-lg flex items-center gap-2 z-10">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs font-semibold text-slate-200">GPS Activo · Huancayo</span>
-          </div>
-
-          <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">REPORTES EN LA INCONTRASTABLE</h3>
-            <div className="max-h-48 overflow-y-auto flex flex-col gap-2">
-              {reportes.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
-              ) : (
-                reportes.map((r) => (
-                  <div 
-                    key={r.id} 
-                    onClick={() => irAUbicacion(r.latitud, r.longitud)}
-                    className="text-xs bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-slate-700 flex justify-between items-center cursor-pointer transition active:scale-95"
-                  >
-                    <span className="capitalize text-slate-200 font-medium">⚠️ {r.tipo_reporte}</span>
-                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">Ver</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Panel Inferior para Reportar Incidentes */}
-        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button
-              onClick={() => handleCrearAlerta('Accidente')}
-              disabled={cargandoAlerta}
-              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-            >
-              🚨 Accidente
-            </button>
-            <button
-              onClick={() => handleCrearAlerta('Tráfico')}
-              disabled={cargandoAlerta}
-              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-            >
-              🚗 Tráfico
-            </button>
-            <button
-              onClick={() => handleCrearAlerta('Operativo')}
-              disabled={cargandoAlerta}
-              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-            >
-              👮 Operativo
-            </button>
-            <button
-              onClick={() => handleCrearAlerta('Vía Cerrada')}
-              disabled={cargandoAlerta}
-              className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-            >
-              🚧 Vía Cerrada
-            </button>
-          </div>
         </div>
       </main>
     </div>
