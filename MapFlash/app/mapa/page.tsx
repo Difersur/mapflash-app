@@ -50,9 +50,8 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed');
 
-  // Tu estructura de nodos original restablecida
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
     "Nodo_B": { lat: -12.0631, lng: -75.2124, direccionGoogle: "Av.+Ferrocarril,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 }, { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }] },
@@ -166,7 +165,6 @@ export default function MapaPage() {
     let paso: string | null = fin;
     while (paso) { camino.unshift(paso); paso = previos[paso]; }
     
-    // Muestra explícitamente el recorrido completo: Mi Ubicación → Nodo_A → Nodo_B → ...
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
     setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
@@ -177,31 +175,43 @@ export default function MapaPage() {
 
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!destino.trim()) return;
+    const busqueda = destino.trim();
+    if (!busqueda) return;
 
-    // Búsqueda inteligente por alias o coincidencia exacta del nodo
-    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
-      n.toLowerCase().includes(destino.toLowerCase()) ||
-      destino.toLowerCase().includes(n.toLowerCase()) ||
-      NODOS_MAPA[n].direccionGoogle.toLowerCase().includes(destino.toLowerCase().replace(/ /g, "+"))
+    // 1. Verificar si coincide directamente con las claves de nuestros nodos (Nodo_A, Nodo_B, Nodo_D)
+    const encontradoPorClave = Object.keys(NODOS_MAPA).find(
+      n => n.toLowerCase() === busqueda.toLowerCase()
     );
 
-    if (nodoEncontrado) {
-      ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
+    // 2. Verificar por alias comunes dentro del mapa local de Huancayo
+    let nodoPorAlias: string | null = null;
+    if (!encontradoPorClave) {
+      const bLower = busqueda.toLowerCase();
+      if (bLower.includes("continental") || bLower.includes("universidad")) nodoPorAlias = "Nodo_A";
+      else if (bLower.includes("ferrocarril")) nodoPorAlias = "Nodo_B";
+      else if (bLower.includes("real plaza") || bLower.includes("plaza")) nodoPorAlias = "Nodo_D";
+    }
+
+    const nodoFinal = encontradoPorClave || nodoPorAlias;
+
+    if (nodoFinal) {
+      // Si es de nuestro grafo, calcula Dijkstra impecablemente con el desglose de nodos
+      ejecutarDijkstraDesdeUbicacion(nodoFinal);
     } else {
-      const terminoBusqueda = destino.toLowerCase();
+      // Si no es un nodo del sistema, se asume dirección libre (Local o Regional)
+      const terminoBusqueda = busqueda.toLowerCase();
       const esBusquedaExterna = terminoBusqueda.includes("peru") || terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya");
       
-      const queryFinal = esBusquedaExterna ? destino : `${destino}, Huancayo, Peru`;
+      const queryFinal = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryFinal);
       const zoom = esBusquedaExterna ? 8 : 14;
       
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
       
-      setCaminoCalculado(`Mi Ubicación → ${destino}`);
+      setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
       setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "Calculando...");
       setCostoRuta("Variable");
-      setRutaActiva(['Mi Ubicación', destino]);
+      setRutaActiva(['Mi Ubicación', busqueda]);
     }
   };
 
@@ -220,7 +230,7 @@ export default function MapaPage() {
       }
     };
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((p) => guardar(p.coords.latitude, p.coords.longitude), () => guardar(coordenadasActuales.lat, coordenadasActuales.lng));
+      navigator.geolocation.getCurrentPosition((p) => guardar(p.coords.latitude, p.coords.longitude), () => guardar(coordenadasActuales.lat, coordinates => coordenadasActuales.lng));
     } else { guardar(coordenadasActuales.lat, coordenadasActuales.lng); }
   };
 
@@ -306,7 +316,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier destino o nodo (ej. Nodo_D, Universidad Continental, Lima)..." 
+              placeholder="Introduce cualquier destino (ej. Universidad Continental, Nodo_D, Real Plaza, Lima)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
