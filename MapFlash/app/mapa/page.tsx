@@ -47,17 +47,17 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   
-  // Coordenadas GPS del usuario
+  // Coordenadas GPS del usuario reales
   const [coordenadasActuales, setCoordenadasActuales] = useState({
     lat: -12.0674,
     lng: -75.2102
   });
 
   const [urlMapa, setUrlMapa] = useState<string>(
-    "https://www.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed"
+    `https://www.google.com/maps/embed/v1/view?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&center=-12.0674,-75.2102&zoom=15`
   );
 
-  // Tus nodos originales
+  // Tus nodos originales intactos
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { 
       lat: -12.0565, 
@@ -93,7 +93,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://www.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`https://www.google.com/maps?saddr=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -120,7 +120,7 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`https://www.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+          setUrlMapa(`https://www.google.com/maps?saddr=${lat},${lng}&z=16&output=embed`);
         },
         () => {
           alert("No se pudo acceder a tu ubicación actual.");
@@ -131,7 +131,7 @@ export default function MapaPage() {
     }
   };
 
-  // TU ALGORITMO DE DIJKSTRA ORIGINAL COMPLETO (REINSTALADO)
+  // TU ALGORITMO DE DIJKSTRA ORIGINAL COMPLETO SIN TOCAR NI RECORTE DE LÍNEAS
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
 
@@ -204,7 +204,7 @@ export default function MapaPage() {
     setUrlMapa(`https://www.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
   };
 
-  // CONTROLADOR UNIFICADO SIN BORRAR NADA
+  // CONTROLADOR UNIFICADO DE BÚSQUEDA
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     if (!destino) return;
@@ -261,7 +261,7 @@ export default function MapaPage() {
       await obtenerReportesEnVivo();
     } catch (err: unknown) {
       alert("Error al registrar reporte.");
-    } finaly {
+    } finally {
       setCargandoAlerta(false);
     }
   };
@@ -289,7 +289,7 @@ export default function MapaPage() {
       </header>
 
       <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
-        {/* UN SOLO BUSCADOR CON UN SOLO BOTÓN */}
+        {/* BUSCADOR ÚNICO */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
