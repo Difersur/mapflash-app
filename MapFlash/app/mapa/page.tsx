@@ -113,7 +113,7 @@ export default function MapaPage() {
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
         
-        // Detección matemática simple de Región: Si la latitud está cerca a la de Lima (-12.04) pero la longitud está hacia la costa (-77.03)
+        // Validación de rango para Lima Metropolitana
         if (lat < -11.9 && lat > -12.3 && lng < -76.8 && lng > -77.2) {
           setRegionActual('Lima');
         } else {
@@ -216,7 +216,7 @@ export default function MapaPage() {
   };
 
   const handleAgregarLugarFrecuente = (e: React.FormEvent) => {
-    preventDefault();
+    e.preventDefault();
     if (!nombreNuevoLugar.trim() || !destino.trim()) return alert("Por favor ingresa un nombre y una dirección.");
 
     const queryFinal = destino.trim().toLowerCase().includes(regionActual.toLowerCase()) 
@@ -246,7 +246,6 @@ export default function MapaPage() {
     localStorage.setItem('favoritos_mapflash', JSON.stringify(filtrados));
   };
 
-  // BUSCADOR LIBRE INTELIGENTE NACIONAL
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     const busqueda = destino.trim();
@@ -254,7 +253,6 @@ export default function MapaPage() {
 
     let terminoLimpio = busqueda.toLowerCase();
 
-    // Solo activamos atajos matemáticos si el usuario está físicamente en la región del nodo
     let nodoDestinoKey: string | null = null;
     if (regionActual === 'Huancayo') {
       if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad") || terminoLimpio.includes("san carlos")) {
@@ -269,7 +267,6 @@ export default function MapaPage() {
     if (nodoDestinoKey) {
       ejecutarDijkstraDesdeUbicacion(nodoDestinoKey);
     } else {
-      // Validamos si el usuario ya escribió una provincia de forma manual para no duplicarla
       const tieneEspecificacionGeografica = 
         terminoLimpio.includes("lima") || 
         terminoLimpio.includes("huancayo") || 
@@ -277,7 +274,6 @@ export default function MapaPage() {
         terminoLimpio.includes("arequipa") || 
         terminoLimpio.includes("trujillo");
 
-      // Si no especificó ciudad, el sistema concatena inteligentemente basándose en la ubicación GPS detectada al inicio
       const queryDestino = tieneEspecificacionGeografica ? busqueda : `${busqueda}, ${regionActual}, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
       
@@ -291,7 +287,7 @@ export default function MapaPage() {
     }
   };
 
-  const handleCrearAlerta = async (tipo: string) => {
+  const handleCreateAlerta = async (tipo: string) => {
     if (!usuario) return alert("Inicia sesión primero.");
     setCargandoAlerta(true);
     const guardar = async (l: number, g: number) => {
@@ -301,7 +297,7 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } finally {
+      } filter {
         setCargandoAlerta(false);
       }
     };
@@ -409,7 +405,7 @@ export default function MapaPage() {
           )}
 
           {mostrarFormLugar && (
-            <div className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
+            <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1 w-full">
                 <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nombre personalizado (Ej: Mi Casa, Trabajo):</label>
                 <input 
@@ -420,8 +416,8 @@ export default function MapaPage() {
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none"
                 />
               </div>
-              <button type="button" onClick={handleAgregarLugarFrecuente} className="bg-emerald-600 hover:bg-emerald-700 text-xs font-bold px-4 py-2 rounded-lg text-white w-full sm:w-auto transition">Confirmar y Guardar</button>
-            </div>
+              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-xs font-bold px-4 py-2 rounded-lg text-white w-full sm:w-auto transition">Confirmar y Guardar</button>
+            </form>
           )}
         </div>
 
@@ -438,6 +434,7 @@ export default function MapaPage() {
                 <span>{lugar.icono}</span>
                 <span>{lugar.nombre}</span>
                 <button 
+                  type="button"
                   onClick={(e) => eliminarLugarFrecuente(lugar.id, e)}
                   className="ml-1 text-[10px] text-slate-500 hover:text-rose-400 font-bold opacity-60 group-hover:opacity-100 transition pl-1"
                   title="Eliminar lugar"
@@ -457,9 +454,6 @@ export default function MapaPage() {
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
             <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
             <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
-            {rutaActiva.length > 0 && (
-              <span className="text-[10px] text-blue-400 block mt-1 font-sans"></span>
-            )}
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO ESTIMADO</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">DISTANCIA TOTAL</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
@@ -473,7 +467,7 @@ export default function MapaPage() {
           <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">📍 Sincronizar GPS</button>
         </div>
 
-        {/* MAPA GENERAL RECONECTADO */}
+        {/* MAPA GENERAL */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[440px] z-20">
           {urlMapa ? (
             <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
@@ -486,10 +480,10 @@ export default function MapaPage() {
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button onClick={() => handleCrearAlerta('Accidente')} disabled={cargandoAlerta} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition">🚨 Accidente</button>
-            <button onClick={() => handleCrearAlerta('Tráfico')} disabled={cargandoAlerta} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition">🚗 Tráfico</button>
-            <button onClick={() => handleCrearAlerta('Operativo')} disabled={cargandoAlerta} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition">👮 Operativo</button>
-            <button onClick={() => handleCrearAlerta('Vía Cerrada')} disabled={cargandoAlerta} className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition">🚧 Vía Cerrada</button>
+            <button onClick={() => handleCreateAlerta('Accidente')} disabled={cargandoAlerta} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition">🚨 Accidente</button>
+            <button onClick={() => handleCreateAlerta('Tráfico')} disabled={cargandoAlerta} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition">🚗 Tráfico</button>
+            <button onClick={() => handleCreateAlerta('Operativo')} disabled={cargandoAlerta} className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition">👮 Operativo</button>
+            <button onClick={() => handleCreateAlerta('Vía Cerrada')} disabled={cargandoAlerta} className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition">🚧 Vía Cerrada</button>
           </div>
         </div>
       </main>
