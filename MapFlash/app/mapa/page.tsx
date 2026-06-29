@@ -50,18 +50,20 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   
-  // Coordenadas base por defecto estables en Huancayo (Urb. Lope de Vega / El Tambo)
+  // Coordenadas iniciales por defecto (Huancayo Centro como respaldo si el GPS está apagado)
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
   
-  // URL embebida inicial con formato seguro q= que previene el fallo del mapamundi alejado
+  // URL inicial segura del iframe
   const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0631,-75.2124&z=15&output=embed');
 
+  // Grafo de Nodos Locales (Huancayo)
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
     "Nodo_B": { lat: -12.0631, lng: -75.2124, direccionGoogle: "Av.+Ferrocarril,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 }, { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }] },
     "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }] }
   });
 
+  // Efecto de inicialización: Obtiene el GPS real del usuario en cualquier parte del mundo
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
@@ -82,7 +84,7 @@ export default function MapaPage() {
         setCoordenadasActuales({ lat, lng });
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
       }, (error) => {
-        console.log("Usando ubicación base de Huancayo configurada por el sistema.", error);
+        console.log("GPS no disponible, usando ubicación base predeterminada.", error);
       });
     }
     obtenerReportesEnVivo();
@@ -93,7 +95,7 @@ export default function MapaPage() {
       const { data } = await supabase.from('alertas_trafico').select('*').eq('estado', 'activo');
       if (data) setReportes(data);
     } catch (err) {
-      console.error("Error al traer reportes", err);
+      console.error("Error al traer reportes de Supabase", err);
     }
   };
 
@@ -132,11 +134,13 @@ export default function MapaPage() {
     }
   };
 
+  // Algoritmo Dijkstra Local
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
     let nodoMasCercano = "Nodo_A";
     let distanciaMinima = Infinity;
 
+    // Buscar el nodo del grafo más cercano a la ubicación GPS actual
     Object.entries(NODOS_MAPA).forEach(([nombre, datos]) => {
       const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
       if (d < distanciaMinima) { 
@@ -180,44 +184,58 @@ export default function MapaPage() {
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
+    // Forzar origen saddr desde tus coordenadas reales hacia el nodo local exacto
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=15&output=embed`);
   };
 
+  // Buscador Unificado Inteligente Anti-Errores Globales
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     const busqueda = destino.trim();
     if (!busqueda) return;
 
+    // Normalizamos el texto quitando ", huancayo" o ", peru" para no romper los alias locales
+    let terminoLimpio = busqueda.toLowerCase()
+      .replace(/,\s*huancayo.*/g, '')
+      .replace(/,\s*peru.*/g, '')
+      .trim();
+
+    // 1. Validar si coincide con un ID de nodo directo
     const encontradoPorClave = Object.keys(NODOS_MAPA).find(
-      n => n.toLowerCase() === busqueda.toLowerCase()
+      n => n.toLowerCase() === terminoLimpio
     );
 
+    // 2. Validar coincidencias por palabras clave de alias locales
     let nodoPorAlias: string | null = null;
     if (!encontradoPorClave) {
-      const bLower = busqueda.toLowerCase();
-      if (bLower.includes("continental") || bLower.includes("universidad")) nodoPorAlias = "Nodo_A";
-      else if (bLower.includes("ferrocarril") || bLower.includes("real y ferrocarril")) nodoPorAlias = "Nodo_B";
-      else if (bLower.includes("real plaza") || bLower.includes("plaza")) nodoPorAlias = "Nodo_D";
+      if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad")) {
+        nodoPorAlias = "Nodo_A";
+      } else if (terminoLimpio.includes("ferrocarril") || terminoLimpio.includes("real y ferrocarril")) {
+        nodoPorAlias = "Nodo_B";
+      } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
+        nodoPorAlias = "Nodo_D";
+      }
     }
 
     const nodoFinal = encontradoPorClave || nodoPorAlias;
 
     if (nodoFinal) {
+      // Si el destino está en Huancayo dentro de nuestro grafo, corre Dijkstra
       ejecutarDijkstraDesdeUbicacion(nodoFinal);
     } else {
-      const terminoBusqueda = busqueda.toLowerCase();
-      const esBusquedaExterna = terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya") || terminoBusqueda.includes("peru");
+      // Si es una búsqueda externa/interprovincial (Lima, Jauja, Oroya, etc.)
+      const esBusquedaExterna = terminoLimpio.includes("lima") || terminoLimpio.includes("jauja") || terminoLimpio.includes("oroya");
       
       const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
       const zoom = esBusquedaExterna ? 12 : 15;
       
-      // Formato unificado limpio de rutas que previene el colapso a escala global
+      // SOLUCIÓN AL BUG: Forzar origen saddr con coordenadas GPS numéricas reales del usuario
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-      setTiempoEstimado(esBusquedaExterna ? "Viaje Nacional Activo" : "15 min");
-      setCostoRuta(esBusquedaExterna ? "Variable Km" : "4.2 Km");
+      setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "15 min");
+      setCostoRuta(esBusquedaExterna ? "Variable" : "3.5 Km");
       setRutaActiva(['Mi Ubicación', busqueda]);
     }
   };
@@ -225,10 +243,11 @@ export default function MapaPage() {
   const handleCrearAlerta = async (tipo: string) => {
     if (!usuario) return alert("Inicia sesión primero.");
     setCargandoAlerta(true);
+    
     const guardar = async (l: number, g: number) => {
       try {
         await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
-        alert(`¡Alerta de ${tipo} registrada!`);
+        alert(`¡Alerta de ${tipo} registrada exitosamente!`);
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
@@ -236,6 +255,7 @@ export default function MapaPage() {
         setCargandoAlerta(false);
       }
     };
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (p) => guardar(p.coords.latitude, p.coords.longitude), 
@@ -328,7 +348,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier destino (ej. Universidad Continental, Real y Ferrocarril, Lima)..." 
+              placeholder="Introduce cualquier destino nacional o local (ej. Universidad Continental, Lima, Jauja)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
