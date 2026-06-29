@@ -51,7 +51,7 @@ export default function MapaPage() {
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   
-  // URL Inicial apuntando a Huancayo usando la API Embed oficial de Google
+  // URL por defecto apuntando al centro de Huancayo con calles y entorno visibles
   const [urlMapa, setUrlMapa] = useState<string>(
     'https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed'
   );
@@ -174,6 +174,7 @@ export default function MapaPage() {
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
+    // Renderiza la ruta en modo direcciones uniendo tu origen con el destino del nodo
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
   };
 
@@ -190,6 +191,7 @@ export default function MapaPage() {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
       const direccionDestinoQuery = encodeURIComponent(destino + ", Huancayo, Peru");
+      // Renderiza el modo direcciones para texto libre preservando el entorno
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=14&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
