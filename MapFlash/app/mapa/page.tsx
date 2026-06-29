@@ -85,7 +85,6 @@ export default function MapaPage() {
   const [opcionesEncontradas, setOpcionesEncontradas] = useState<OpcionSugerida[]>([]);
   const [mostrarPanelOpciones, setMostrarPanelOpciones] = useState(false);
 
-  // NUEVOS ESTADOS PARA LAS RUTAS ALTERNATIVAS (Captura Google Maps)
   const [rutasAlternativas, setRutasAlternativas] = useState<RutaAlternativa[]>([]);
   const [rutaSeleccionadaIndex, setRutaSeleccionadaIndex] = useState<number>(0);
 
@@ -166,7 +165,8 @@ export default function MapaPage() {
     window.location.href = '/';
   };
 
-  const abrirSelector DeArchivo = () => {
+  // CORREGIDO: Nombre de función sin espacios
+  const abrirSelectorDeArchivo = () => {
     if (archivoInputRef.current) {
       archivoInputRef.current.click();
     }
@@ -201,7 +201,6 @@ export default function MapaPage() {
   };
 
   const generarRutasAlternativasSimuladas = (destinoNombre: string, queryBase: string) => {
-    // Genera alternativas dinámicas basadas en el destino tal como se ve en tu foto de muestra
     const esRutaLarga = destinoNombre.toLowerCase().includes("lurin") || destinoNombre.toLowerCase().includes("trujillo") || destinoNombre.toLowerCase().includes("lima");
     
     if (esRutaLarga) {
@@ -415,7 +414,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* MODAL PERFIL INTERACTIVO ORIGINAL COMPLETO */}
+      {/* MODAL PERFIL INTERACTIVO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -425,7 +424,6 @@ export default function MapaPage() {
                 <button onClick={() => setVerPerfilDetallado(false)} className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800 p-2 rounded-xl transition">✕ Cerrar</button>
               </div>
               
-              {/* Contenedor Interactivo de Foto */}
               <div className="flex flex-col items-center gap-3 mb-6 bg-slate-950 p-5 rounded-2xl border border-slate-800">
                 <div className="relative group cursor-pointer" onClick={abrirSelectorDeArchivo}>
                   <img 
@@ -477,7 +475,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Busca cualquier calle, avenida o plaza del Perú... (Ej: Av. Javier Prado, Lima / Jirón Puno, Cusco)" 
+              placeholder="Busca cualquier calle, avenida o plaza del Perú... (Ej: Av. Javier Prado, Lima)" 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
@@ -492,24 +490,23 @@ export default function MapaPage() {
           )}
 
           {mostrarFormLugar && (
-            <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
+            <form onSubmit={handleAgregarLuerte} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1 w-full">
-                <input type="text" placeholder="Ponle un alias... (Ej: Casa Trujillo, Trabajo Lima)" value={nombreNuevoLugar} onChange={(e) => setNombreNuevoLugar(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none" />
+                <input type="text" placeholder="Ponle un alias... (Ej: Casa)" value={nombreNuevoLugar} onChange={(e) => setNombreNuevoLugar(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none" />
               </div>
               <button type="submit" className="bg-emerald-600 text-xs font-bold px-4 py-2 rounded-lg text-white transition">Guardar</button>
             </form>
           )}
         </div>
 
-        {/* PANEL DE DESAMBIGUACIÓN MULTI-REGIÓN */}
+        {/* PANEL DE DESAMBIGUACIÓN */}
         {mostrarPanelOpciones && opcionesEncontradas.length > 0 && (
           <div className="bg-slate-900 border-2 border-amber-500/40 p-4 rounded-2xl shadow-2xl flex flex-col gap-3">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2">
               <div className="flex items-center gap-2">
                 <span>⚠️</span>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Múltiples lugares encontrados en distintas regiones del Perú:</span>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Múltiples lugares encontrados:</span>
               </div>
-              <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-mono">Selector global</span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -524,7 +521,6 @@ export default function MapaPage() {
                     <span className="block text-xs font-bold text-slate-200 group-hover:text-blue-400 transition mb-1">📍 {opcion.nombreEspecifico}</span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">{opcion.descripcion}</span>
                   </div>
-                  <span className="block text-[10px] text-slate-600 mt-3 italic font-mono">Destino: {opcion.direccionQuery}</span>
                 </button>
               ))}
             </div>
@@ -533,7 +529,7 @@ export default function MapaPage() {
 
         {/* FAVORITOS */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">⭐ Tus Marcadores del Perú:</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">⭐ Tus Marcadores:</span>
           <div className="flex flex-wrap gap-2 items-center mt-1">
             {lugaresGuardados.map((lugar) => (
               <div key={lugar.id} onClick={() => irALugarGuardado(lugar)} className={`flex items-center gap-2 text-xs px-3.5 py-2 rounded-xl border transition font-medium cursor-pointer relative group ${nodoSeleccionado === lugar.id ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}>
@@ -552,10 +548,10 @@ export default function MapaPage() {
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">Distancia Estimada</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
 
-        {/* NUEVO: PANEL INTERACTIVO DE RUTAS ALTERNATIVAS (Basado en tu captura) */}
+        {/* INTERACTIVO DE RUTAS ALTERNATIVAS */}
         {rutasAlternativas.length > 0 && !mostrarPanelOpciones && (
           <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">🛣️ Rutas sugeridas encontradas:</span>
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">¼️ Rutas sugeridas encontradas:</span>
             <div className="flex flex-col gap-2 mt-1">
               {rutasAlternativas.map((ruta, idx) => (
                 <div 
@@ -583,9 +579,6 @@ export default function MapaPage() {
         {/* ENLACES RÁPIDOS */}
         {rutaActiva.length > 0 && !mostrarPanelOpciones && (
           <div className="bg-slate-900 border border-blue-500/20 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">🗺️ Opciones de Navegación Externa:</span>
-            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <a 
                 href={`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestinoActual || encodeURIComponent(rutaActiva[1])}&travelmode=driving`}
@@ -595,7 +588,7 @@ export default function MapaPage() {
               >
                 <div>
                   <span className="block text-xs font-bold text-slate-200 group-hover:text-blue-400">Lanzar indicaciones GPS</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">Abrir en tu app nativa de mapas con guiado por voz</span>
+                  <span className="block text-[10px] text-slate-500 mt-0.5">Abrir en tu app nativa de mapas</span>
                 </div>
                 <span className="text-sm">🚀</span>
               </a>
