@@ -57,7 +57,7 @@ export default function MapaPage() {
     "https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed"
   );
 
-  // Nodos fijos del mapa con sus posiciones precisas
+  // Nodos registrados con coordenadas exactas
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { 
       lat: -12.0565, 
@@ -94,7 +94,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -121,7 +121,7 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+          setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&z=16&output=embed`);
         },
         () => {
           alert("No se pudo acceder a tu ubicación actual.");
@@ -132,7 +132,7 @@ export default function MapaPage() {
     }
   };
 
-  // PROCESADO UNIFICADO: Un solo input, un solo botón. Muestra ruta exacta entre tú y el destino.
+  // BOTÓN UNIFICADO: Un solo input, un solo botón. Muestra ruta exacta entre tú y el destino.
   const procesarRutaUnificada = (e: React.FormEvent) => {
     e.preventDefault();
     if (!destino) return;
@@ -150,7 +150,7 @@ export default function MapaPage() {
       setCostoRuta(`2.4 Km`);
       setRutaActiva(['Mi Ubicación', nodoEncontrado]);
 
-      // Genera el mapa desde tus coordenadas reales del GPS hasta las coordenadas numéricas de ese nodo
+      // Genera el mapa usando los templates de string correctos (`$`)
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${finTarget.lat},${finTarget.lng}&z=14&output=embed`);
     } else {
       // Búsqueda libre global (por ejemplo: "Universidad Continental")
@@ -197,10 +197,11 @@ export default function MapaPage() {
 
       if (error) throw error;
       alert(`¡Alerta de ${tipo} registrada!`);
-      obtenerReportesEnVivo();
+      await obtenerReportesEnVivo();
     } catch (err: unknown) {
       alert("Error al registrar reporte.");
-    } finaly {
+    } finally {
+      // CORREGIDO: Sintaxis correcta de finally para evitar errores en Vercel
       setCargandoAlerta(false);
     }
   };
