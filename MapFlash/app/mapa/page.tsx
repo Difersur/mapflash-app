@@ -36,7 +36,6 @@ interface NodoGrafo {
   conexiones: ConexionNodo[]; 
 }
 
-// Nueva estructura para los puntos guardados personalizados por el usuario
 interface LugarGuardado {
   id: string;
   nombre: string;
@@ -68,6 +67,9 @@ export default function MapaPage() {
   // Coordenadas GPS en vivo del dispositivo
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
   
+  // Estado para saber de qué región es el usuario actual para búsquedas inteligentes
+  const [regionActual, setRegionActual] = useState<string>('Huancayo');
+  
   // URL base interactiva
   const [urlMapa, setUrlMapa] = useState<string>('');
 
@@ -92,12 +94,10 @@ export default function MapaPage() {
       });
     }
 
-    // Cargar los lugares guardados personalizados por el usuario
     const favoritosLocales = localStorage.getItem('favoritos_mapflash');
     if (favoritosLocales) {
       setLugaresGuardados(JSON.parse(favoritosLocales));
     } else {
-      // Puntos iniciales recomendados corregidos con la ubicación real
       const porDefecto: LugarGuardado[] = [
         { id: '1', nombre: 'U. Continental (San Carlos)', direccionQuery: 'Universidad Continental, Av. San Carlos, Huancayo', icono: '🏫' },
         { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Av. Ferrocarril, Huancayo', icono: '🛍️' },
@@ -112,6 +112,14 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
+        
+        // Detección matemática simple de Región: Si la latitud está cerca a la de Lima (-12.04) pero la longitud está hacia la costa (-77.03)
+        if (lat < -11.9 && lat > -12.3 && lng < -76.8 && lng > -77.2) {
+          setRegionActual('Lima');
+        } else {
+          setRegionActual('Huancayo');
+        }
+
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, (error) => {
         console.log("Acceso al GPS denegado por políticas locales.", error);
@@ -159,11 +167,16 @@ export default function MapaPage() {
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
         setCaminoCalculado("Mapa centrado en tu posición GPS real.");
         setNodoSeleccionado(null);
+        
+        if (lat < -11.9 && lat > -12.3 && lng < -76.8 && lng > -77.2) {
+          setRegionActual('Lima');
+        } else {
+          setRegionActual('Huancayo');
+        }
       });
     }
   };
 
-  // Algoritmo Dijkstra Local acoplado al mapa sin perder ubicaciones
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
 
@@ -190,7 +203,6 @@ export default function MapaPage() {
     setUrlMapa(`https://maps.google.com/maps?saddr=${origenLat},${origenLng}&daddr=${destinoNodo.lat},${destinoNodo.lng}&z=15&output=embed`);
   };
 
-  // Nueva función para navegar directamente a un lugar guardado personalizado
   const irALugarGuardado = (lugar: LugarGuardado) => {
     setNodoSeleccionado(lugar.id);
     const queryDestino = encodeURIComponent(lugar.direccionQuery);
@@ -203,15 +215,18 @@ export default function MapaPage() {
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestino}&z=15&output=embed`);
   };
 
-  // Guardar dinámicamente un punto recurrente nuevo
   const handleAgregarLugarFrecuente = (e: React.FormEvent) => {
-    e.preventDefault();
+    preventDefault();
     if (!nombreNuevoLugar.trim() || !destino.trim()) return alert("Por favor ingresa un nombre y una dirección.");
+
+    const queryFinal = destino.trim().toLowerCase().includes(regionActual.toLowerCase()) 
+      ? destino.trim() 
+      : `${destino.trim()}, ${regionActual}, Peru`;
 
     const nuevoLugar: LugarGuardado = {
       id: Date.now().toString(),
       nombre: nombreNuevoLugar.trim(),
-      direccionQuery: destino.trim().includes("Huancayo") ? destino.trim() : `${destino.trim()}, Huancayo, Peru`,
+      direccionQuery: queryFinal,
       icono: '📍'
     };
 
@@ -224,44 +239,51 @@ export default function MapaPage() {
     alert(`¡"${nuevoLugar.nombre}" guardado con éxito en tus puntos frecuentes!`);
   };
 
-  // Eliminar un punto recurrente
   const eliminarLugarFrecuente = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Evita que se dispare la navegación al hacer clic en borrar
+    e.stopPropagation();
     const filtrados = lugaresGuardados.filter(item => item.id !== id);
     setLugaresGuardados(filtrados);
     localStorage.setItem('favoritos_mapflash', JSON.stringify(filtrados));
   };
 
-  // Buscador Libre: Resuelve cadenas libres o atajos de nodos locales
+  // BUSCADOR LIBRE INTELIGENTE NACIONAL
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     const busqueda = destino.trim();
     if (!busqueda) return;
 
-    let terminoLimpio = busqueda.toLowerCase()
-      .replace(/,\s*huancayo.*/g, '')
-      .replace(/,\s*peru.*/g, '')
-      .trim();
+    let terminoLimpio = busqueda.toLowerCase();
 
+    // Solo activamos atajos matemáticos si el usuario está físicamente en la región del nodo
     let nodoDestinoKey: string | null = null;
-    if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad") || terminoLimpio.includes("san carlos")) {
-      nodoDestinoKey = "Nodo_A";
-    } else if (terminoLimpio.includes("ferrocarril")) {
-      nodoDestinoKey = "Nodo_B";
-    } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
-      nodoDestinoKey = "Nodo_D";
+    if (regionActual === 'Huancayo') {
+      if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad") || terminoLimpio.includes("san carlos")) {
+        nodoDestinoKey = "Nodo_A";
+      } else if (terminoLimpio.includes("ferrocarril")) {
+        nodoDestinoKey = "Nodo_B";
+      } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
+        nodoDestinoKey = "Nodo_D";
+      }
     }
 
     if (nodoDestinoKey) {
       ejecutarDijkstraDesdeUbicacion(nodoDestinoKey);
     } else {
-      const esBusquedaExterna = terminoLimpio.includes("lima") || terminoLimpio.includes("jauja") || terminoLimpio.includes("oroya");
-      const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
+      // Validamos si el usuario ya escribió una provincia de forma manual para no duplicarla
+      const tieneEspecificacionGeografica = 
+        terminoLimpio.includes("lima") || 
+        terminoLimpio.includes("huancayo") || 
+        terminoLimpio.includes("jauja") || 
+        terminoLimpio.includes("arequipa") || 
+        terminoLimpio.includes("trujillo");
+
+      // Si no especificó ciudad, el sistema concatena inteligentemente basándose en la ubicación GPS detectada al inicio
+      const queryDestino = tieneEspecificacionGeografica ? busqueda : `${busqueda}, ${regionActual}, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
       
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
       
-      setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
+      setCaminoCalculado(`Mi Ubicación → ${busqueda} (${tieneEspecificacionGeografica ? 'Búsqueda Global' : regionActual})`);
       setTiempoEstimado("Calculando...");
       setCostoRuta("Buscando ruta óptima...");
       setRutaActiva(['Mi Ubicación', busqueda]);
@@ -366,7 +388,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier dirección o destino libre (Ej: Universidad Continental, El Tambo, Jauja)..." 
+              placeholder={`Introduce cualquier dirección libre o lugar frecuente (Detectado: ${regionActual})...`} 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
@@ -374,20 +396,20 @@ export default function MapaPage() {
             <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition active:scale-95">Buscar Ubicación 🔍</button>
           </form>
 
-          {/* Formulario desplegable para guardar el punto buscado en Favoritos */}
           {destino && (
             <div className="mt-3 flex justify-end">
               <button 
+                type="button"
                 onClick={() => setMostrarFormLugar(!mostrarFormLugar)} 
                 className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition"
               >
-                ⭐ Guardar esta dirección como frecuente
+                ⭐ Guardar dirección en mis puntos frecuentes
               </button>
             </div>
           )}
 
           {mostrarFormLugar && (
-            <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
+            <div className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1 w-full">
                 <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nombre personalizado (Ej: Mi Casa, Trabajo):</label>
                 <input 
@@ -398,12 +420,12 @@ export default function MapaPage() {
                   className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none"
                 />
               </div>
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-xs font-bold px-4 py-2 rounded-lg text-white w-full sm:w-auto transition">Confirmar y Guardar</button>
-            </form>
+              <button type="button" onClick={handleAgregarLugarFrecuente} className="bg-emerald-600 hover:bg-emerald-700 text-xs font-bold px-4 py-2 rounded-lg text-white w-full sm:w-auto transition">Confirmar y Guardar</button>
+            </div>
           )}
         </div>
 
-        {/* SECCIÓN INNOVADORA: PUNTOS MÁS RECORRIDOS / LUGARES GUARDADOS */}
+        {/* TUS LUGARES GUARDADOS */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">⭐ Tus Lugares Guardados (Frecuentes):</span>
           <div className="flex flex-wrap gap-2 items-center mt-1">
@@ -415,8 +437,6 @@ export default function MapaPage() {
               >
                 <span>{lugar.icono}</span>
                 <span>{lugar.nombre}</span>
-                
-                {/* Botón discreto para eliminar de favoritos */}
                 <button 
                   onClick={(e) => eliminarLugarFrecuente(lugar.id, e)}
                   className="ml-1 text-[10px] text-slate-500 hover:text-rose-400 font-bold opacity-60 group-hover:opacity-100 transition pl-1"
@@ -438,7 +458,7 @@ export default function MapaPage() {
             <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
             <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
             {rutaActiva.length > 0 && (
-              <span className="text-[10px] text-blue-400 block mt-1 font-sans">🛣️ Rastreo activo enlazado al GPS</span>
+              <span className="text-[10px] text-blue-400 block mt-1 font-sans"></span>
             )}
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO ESTIMADO</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
@@ -448,9 +468,9 @@ export default function MapaPage() {
         {/* CONTROLES DE NAVEGACIÓN LIBRE */}
         <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
           <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Navegación y Clis Libres Habilitados
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Región Geográfica: {regionActual}, Perú
           </span>
-          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">📍 Centrar Mi GPS</button>
+          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">📍 Sincronizar GPS</button>
         </div>
 
         {/* MAPA GENERAL RECONECTADO */}
