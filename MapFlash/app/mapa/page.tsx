@@ -36,6 +36,14 @@ interface NodoGrafo {
   conexiones: ConexionNodo[]; 
 }
 
+// Nueva estructura para los puntos guardados personalizados por el usuario
+interface LugarGuardado {
+  id: string;
+  nombre: string;
+  direccionQuery: string;
+  icono: string;
+}
+
 export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
@@ -45,27 +53,32 @@ export default function MapaPage() {
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   
-  // Variables de Control e Historial del Grafo
-  const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce un destino o interactúa libremente con el mapa.');
+  // Variables de Control e Historial del Grafo originales
+  const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce un destino o selecciona un lugar guardado.');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [nodoSeleccionado, setNodoSeleccionado] = useState<string | null>(null);
   
+  // Estado para lugares guardados del usuario actual
+  const [lugaresGuardados, setLugaresGuardados] = useState<LugarGuardado[]>([]);
+  const [nombreNuevoLugar, setNombreNuevoLugar] = useState('');
+  const [mostrarFormLugar, setMostrarFormLugar] = useState(false);
+  
   // Coordenadas GPS en vivo del dispositivo
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
   
-  // URL base interactiva que permite clics libres en pantalla y rutas manuales
+  // URL base interactiva
   const [urlMapa, setUrlMapa] = useState<string>('');
 
-  // Nodos de control locales (Huancayo)
+  // CORRECCIÓN DE COORDENADAS REALES DE HUANCAYO (San Carlos, Real Plaza, Ferrocarril)
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
-    "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
-    "Nodo_B": { lat: -12.0631, lng: -75.2124, direccionGoogle: "Av.+Ferrocarril,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 }, { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }] },
-    "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }] }
+    "Nodo_A": { lat: -12.0544, lng: -75.1989, direccionGoogle: "Universidad+Continental+San+Carlos,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 2.8, tiempoMin: 8 }] },
+    "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }, { idDestino: "Nodo_D", distanciaKm: 1.2, tiempoMin: 4 }] },
+    "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 1.2, tiempoMin: 4 }] }
   });
 
-  // Inicialización de datos y Geoposicionamiento nativo
+  // Inicialización de datos, Geoposicionamiento nativo y Carga de Favoritos
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
@@ -78,17 +91,31 @@ export default function MapaPage() {
         avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien" 
       });
     }
+
+    // Cargar los lugares guardados personalizados por el usuario
+    const favoritosLocales = localStorage.getItem('favoritos_mapflash');
+    if (favoritosLocales) {
+      setLugaresGuardados(JSON.parse(favoritosLocales));
+    } else {
+      // Puntos iniciales recomendados corregidos con la ubicación real
+      const porDefecto: LugarGuardado[] = [
+        { id: '1', nombre: 'U. Continental (San Carlos)', direccionQuery: 'Universidad Continental, Av. San Carlos, Huancayo', icono: '🏫' },
+        { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Av. Ferrocarril, Huancayo', icono: '🛍️' },
+        { id: '3', nombre: 'Av. Ferrocarril', direccionQuery: 'Av. Ferrocarril, Huancayo', icono: '🛤️' }
+      ];
+      setLugaresGuardados(porDefecto);
+      localStorage.setItem('favoritos_mapflash', JSON.stringify(porDefecto));
+    }
     
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        // Se inicializa el mapa dinámico permitiendo que Google procese búsquedas independientes en el visor
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed&iwloc=near`);
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, (error) => {
         console.log("Acceso al GPS denegado por políticas locales.", error);
-        setUrlMapa(`https://maps.google.com/maps?q=-12.0631,-75.2124&z=14&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=-12.0631,-75.2124&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -131,6 +158,7 @@ export default function MapaPage() {
         setCoordenadasActuales({ lat, lng });
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
         setCaminoCalculado("Mapa centrado en tu posición GPS real.");
+        setNodoSeleccionado(null);
       });
     }
   };
@@ -147,15 +175,61 @@ export default function MapaPage() {
     const difLat = destinoNodo.lat - origenLat;
     const difLng = destinoNodo.lng - origenLng;
     const distanciaCalculada = Math.sqrt(difLat * difLat + difLng * difLng) * 111;
-    const tiempoCalculadoMin = Math.round(distanciaCalculada * 3.5) || 5;
+    const tiempoCalculadoMin = Math.round(distanciaCalculada * 4.5) || 5;
 
-    setCaminoCalculado(`Mi Ubicación → ${fin === "Nodo_A" ? "Universidad Continental" : fin}`);
+    let nombreFormateado = "Destino";
+    if (fin === "Nodo_A") nombreFormateado = "Universidad Continental (San Carlos)";
+    if (fin === "Nodo_B") nombreFormateado = "Av. Ferrocarril";
+    if (fin === "Nodo_D") nombreFormateado = "Real Plaza Huancayo";
+
+    setCaminoCalculado(`Mi Ubicación → ${nombreFormateado}`);
     setTiempoEstimado(`${tiempoCalculadoMin} min`);
     setCostoRuta(`${distanciaCalculada.toFixed(2)} Km`);
     setRutaActiva(['Mi Ubicación', fin]);
     
-    // Muestra la ruta limpia inyectando las variables reales
     setUrlMapa(`https://maps.google.com/maps?saddr=${origenLat},${origenLng}&daddr=${destinoNodo.lat},${destinoNodo.lng}&z=15&output=embed`);
+  };
+
+  // Nueva función para navegar directamente a un lugar guardado personalizado
+  const irALugarGuardado = (lugar: LugarGuardado) => {
+    setNodoSeleccionado(lugar.id);
+    const queryDestino = encodeURIComponent(lugar.direccionQuery);
+    
+    setCaminoCalculado(`Mi Ubicación → ${lugar.nombre}`);
+    setTiempoEstimado("Calculando...");
+    setCostoRuta("Trazando ruta...");
+    setRutaActiva(['Mi Ubicación', lugar.nombre]);
+    
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestino}&z=15&output=embed`);
+  };
+
+  // Guardar dinámicamente un punto recurrente nuevo
+  const handleAgregarLugarFrecuente = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!nombreNuevoLugar.trim() || !destino.trim()) return alert("Por favor ingresa un nombre y una dirección.");
+
+    const nuevoLugar: LugarGuardado = {
+      id: Date.now().toString(),
+      nombre: nombreNuevoLugar.trim(),
+      direccionQuery: destino.trim().includes("Huancayo") ? destino.trim() : `${destino.trim()}, Huancayo, Peru`,
+      icono: '📍'
+    };
+
+    const listaActualizada = [...lugaresGuardados, nuevoLugar];
+    setLugaresGuardados(listaActualizada);
+    localStorage.setItem('favoritos_mapflash', JSON.stringify(listaActualizada));
+    
+    setNombreNuevoLugar('');
+    setMostrarFormLugar(false);
+    alert(`¡"${nuevoLugar.nombre}" guardado con éxito en tus puntos frecuentes!`);
+  };
+
+  // Eliminar un punto recurrente
+  const eliminarLugarFrecuente = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Evita que se dispare la navegación al hacer clic en borrar
+    const filtrados = lugaresGuardados.filter(item => item.id !== id);
+    setLugaresGuardados(filtrados);
+    localStorage.setItem('favoritos_mapflash', JSON.stringify(filtrados));
   };
 
   // Buscador Libre: Resuelve cadenas libres o atajos de nodos locales
@@ -170,7 +244,7 @@ export default function MapaPage() {
       .trim();
 
     let nodoDestinoKey: string | null = null;
-    if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad") || terminoLimpio.includes("instituto")) {
+    if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad") || terminoLimpio.includes("san carlos")) {
       nodoDestinoKey = "Nodo_A";
     } else if (terminoLimpio.includes("ferrocarril")) {
       nodoDestinoKey = "Nodo_B";
@@ -185,7 +259,6 @@ export default function MapaPage() {
       const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
       
-      // Enrutamiento libre global interactivo: une el GPS con el texto ingresado
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
@@ -300,29 +373,63 @@ export default function MapaPage() {
             />
             <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition active:scale-95">Buscar Ubicación 🔍</button>
           </form>
+
+          {/* Formulario desplegable para guardar el punto buscado en Favoritos */}
+          {destino && (
+            <div className="mt-3 flex justify-end">
+              <button 
+                onClick={() => setMostrarFormLugar(!mostrarFormLugar)} 
+                className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition"
+              >
+                ⭐ Guardar esta dirección como frecuente
+              </button>
+            </div>
+          )}
+
+          {mostrarFormLugar && (
+            <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Nombre personalizado (Ej: Mi Casa, Trabajo):</label>
+                <input 
+                  type="text" 
+                  placeholder="Escribe un alias para recordar este lugar..." 
+                  value={nombreNuevoLugar}
+                  onChange={(e) => setNombreNuevoLugar(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none"
+                />
+              </div>
+              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-xs font-bold px-4 py-2 rounded-lg text-white w-full sm:w-auto transition">Confirmar y Guardar</button>
+            </form>
+          )}
         </div>
 
-        {/* ACCESOS DIRECTOS DE NODOS RECONECTADOS */}
-        <div className="flex flex-wrap gap-2 items-center bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-2">Puntos de control:</span>
-          <button 
-            onClick={() => ejecutarDijkstraDesdeUbicacion('Nodo_A')} 
-            className={`text-xs px-4 py-2 rounded-xl border transition font-medium ${nodoSeleccionado === 'Nodo_A' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
-          >
-            🏫 U. Continental
-          </button>
-          <button 
-            onClick={() => ejecutarDijkstraDesdeUbicacion('Nodo_B')} 
-            className={`text-xs px-4 py-2 rounded-xl border transition font-medium ${nodoSeleccionado === 'Nodo_B' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
-          >
-            🛤️ Av. Ferrocarril
-          </button>
-          <button 
-            onClick={() => ejecutarDijkstraDesdeUbicacion('Nodo_D')} 
-            className={`text-xs px-4 py-2 rounded-xl border transition font-medium ${nodoSeleccionado === 'Nodo_D' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
-          >
-            🛍️ Real Plaza Hyo
-          </button>
+        {/* SECCIÓN INNOVADORA: PUNTOS MÁS RECORRIDOS / LUGARES GUARDADOS */}
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">⭐ Tus Lugares Guardados (Frecuentes):</span>
+          <div className="flex flex-wrap gap-2 items-center mt-1">
+            {lugaresGuardados.map((lugar) => (
+              <div 
+                key={lugar.id}
+                onClick={() => irALugarGuardado(lugar)}
+                className={`flex items-center gap-2 text-xs px-3.5 py-2 rounded-xl border transition font-medium cursor-pointer relative group ${nodoSeleccionado === lugar.id ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-500/10' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
+              >
+                <span>{lugar.icono}</span>
+                <span>{lugar.nombre}</span>
+                
+                {/* Botón discreto para eliminar de favoritos */}
+                <button 
+                  onClick={(e) => eliminarLugarFrecuente(lugar.id, e)}
+                  className="ml-1 text-[10px] text-slate-500 hover:text-rose-400 font-bold opacity-60 group-hover:opacity-100 transition pl-1"
+                  title="Eliminar lugar"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {lugaresGuardados.length === 0 && (
+              <span className="text-xs text-slate-500 italic">No tienes puntos guardados aún. ¡Busca una dirección arriba para agregarla!</span>
+            )}
+          </div>
         </div>
 
         {/* MÉTRICAS SUPERIORES */}
