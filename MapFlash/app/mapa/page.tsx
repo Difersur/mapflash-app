@@ -50,11 +50,7 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
-  
-  // URL Inicial apuntando por defecto a Huancayo de forma segura
-  const [urlMapa, setUrlMapa] = useState<string>(
-    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed'
-  );
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -80,15 +76,19 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=$${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
   }, []);
 
   const obtenerReportesEnVivo = async () => {
-    const { data } = await supabase.from('alertas_trafico').select('*').eq('estado', 'activo');
-    if (data) setReportes(data);
+    try {
+      const { data } = await supabase.from('alertas_trafico').select('*').eq('estado', 'activo');
+      if (data) setReportes(data);
+    } catch (err) {
+      console.error("Error al traer reportes", err);
+    }
   };
 
   const handleCerrarSesion = () => {
@@ -117,7 +117,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=$${lat},${lng}&z=16&output=embed`);
       });
     }
   };
@@ -129,7 +129,10 @@ export default function MapaPage() {
 
     Object.entries(NODOS_MAPA).forEach(([nombre, datos]) => {
       const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
-      if (d < distanciaMinima) { distanciaMinima = d; nodoMasCercano = nombre; }
+      if (d < distanciaMinima) { 
+        distanciaMinima = d; 
+        nodoMasCercano = nombre; 
+      }
     });
 
     const distancias: Record<string, number> = {};
@@ -141,7 +144,8 @@ export default function MapaPage() {
     distancias[nodoMasCercano] = 0; tiempos[nodoMasCercano] = 0;
 
     while (visitados.size < Object.keys(NODOS_MAPA).length) {
-      let nodoActual: string | null = null; let distMin = Infinity;
+      let nodoActual: string | null = null; 
+      let distMin = Infinity;
       Object.keys(NODOS_MAPA).forEach(nodo => {
         if (!visitados.has(nodo) && distancias[nodo] < distMin) { distMin = distancias[nodo]; nodoActual = nodo; }
       });
@@ -157,7 +161,8 @@ export default function MapaPage() {
       });
     }
 
-    const camino: string[] = []; let paso: string | null = fin;
+    const camino: string[] = []; 
+    let paso: string | null = fin;
     while (paso) { camino.unshift(paso); paso = previos[paso]; }
     
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
@@ -165,29 +170,23 @@ export default function MapaPage() {
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    // Renderiza la ruta exacta entre origen y el nodo objetivo en Google Maps embed nativo
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
+    setUrlMapa(`https://maps.google.com/maps?saddr=$${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
   };
 
-  // BUSCADOR MEJORADO UNIVERSAL PARA CUALQUIER DIRECCIÓN
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     if (!destino.trim()) return;
 
-    // 1. Intentar buscar primero si el usuario escribió un nodo conocido
     const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
       n.toLowerCase().includes(destino.toLowerCase()) ||
       NODOS_MAPA[n].direccionGoogle.toLowerCase().includes(destino.toLowerCase().replace(/ /g, "+"))
     );
 
     if (nodoEncontrado) {
-      ejecutarDijkstraDesdeUbicacion(nodoEnFound);
+      ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
-      // 2. BUSCADOR LIBRE: Si es cualquier otra dirección del mapa, estructurar la petición para que Google la encuentre
       const direccionDestinoQuery = encodeURIComponent(destino + ", Huancayo, Peru");
-      
-      // Cambiamos el mapa para pintar la trayectoria desde donde estás hasta la dirección libre escrita
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=14&output=embed`);
+      setUrlMapa(`https://maps.google.com/maps?saddr=$${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=14&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
       setTiempoEstimado("Calculando...");
@@ -200,10 +199,15 @@ export default function MapaPage() {
     if (!usuario) return alert("Inicia sesión primero.");
     setCargandoAlerta(true);
     const guardar = async (l: number, g: number) => {
-      await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
-      alert(`¡Alerta de ${tipo} registrada!`);
-      obtenerReportesEnVivo();
-      setCargandoAlerta(false);
+      try {
+        await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
+        alert(`¡Alerta de ${tipo} registrada!`);
+        obtenerReportesEnVivo();
+      } catch (err) {
+        alert("Error al registrar reporte.");
+      } finally {
+        setCargandoAlerta(false);
+      }
     };
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((p) => guardar(p.coords.latitude, p.coords.longitude), () => guardar(coordenadasActuales.lat, coordenadasActuales.lng));
@@ -243,7 +247,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* VENTANA DE PERFIL */}
+      {/* VENTANA DE PERFIL DETALLADO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -286,7 +290,7 @@ export default function MapaPage() {
         </div>
       )}
 
-      {/* CUERPO PRINCIPAL DEL MAPA */}
+      {/* CUERPO PRINCIPAL */}
       <main className="flex-1 bg-slate-950 p-4 flex flex-col gap-4 relative z-10">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
