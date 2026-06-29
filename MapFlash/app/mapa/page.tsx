@@ -41,25 +41,25 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
   
-  // Visores métricos superiores totalmente interactivos
+  // Visores métricos superiores interactivos
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Esperando origen y destino...');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   
-  // Estado para recordar la latitud y longitud actual para los reportes de incidentes
+  // Coordenadas de respaldo para incidentes
   const [coordenadasActuales, setCoordenadasActuales] = useState({
-    lat: -9.19,
-    lng: -75.01
+    lat: -12.065,
+    lng: -75.215
   });
 
-  // URL inicializada apuntando al Mapa Nacional del Perú completo
+  // URL del iframe - Carga inicial limpia
   const [urlMapa, setUrlMapa] = useState<string>(
-    "https://maps.google.com/maps?q=Peru&z=6&output=embed"
+    "https://maps.google.com/maps?q=-12.065,-75.215&z=14&output=embed"
   );
 
-  // Tus 3 nodos de Huancayo con sus direcciones legibles para Google
+  // Nodos georreferenciados originales
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { 
       lat: -12.056, 
@@ -113,7 +113,7 @@ export default function MapaPage() {
     return '👤';
   };
 
-  // RESTAURADA: Función nativa para localizar la posición actual del usuario vía GPS
+  // Geolocalización por GPS activa para marcar posición
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -121,11 +121,10 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          // Mueve el mapa directamente a la ubicación exacta del usuario
           setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
         },
         () => {
-          alert("No se pudo acceder a tu ubicación actual o el permiso fue denegado.");
+          alert("No se pudo acceder a tu ubicación actual.");
         }
       );
     } else {
@@ -133,7 +132,7 @@ export default function MapaPage() {
     }
   };
 
-  // Dijkstra corregido con las variables inyectadas sin romper la URL
+  // Dijkstra con template strings arreglados `${}` sin romper la sintaxis
   const ejecutarDijkstra = (inicio: string, fin: string) => {
     if (!NODOS_MAPA[inicio] || !NODOS_MAPA[fin]) return;
 
@@ -186,11 +185,10 @@ export default function MapaPage() {
     }
 
     setCaminoCalculado(`Camino: ${camino.join(' → ')}`);
-    setTiempoEstimated(`${tiempos[fin]} min`);
+    setTiempoEstimado(`${tiempos[fin]} min`);
     setCostoRuta(`${distancias[fin]} Km`);
     setRutaActiva(camino);
     
-    // Inyección corregida de strings con template literals reales `${}` de JavaScript
     const origenDir = NODOS_MAPA[inicio].direccionGoogle;
     const destinoDir = NODOS_MAPA[fin].direccionGoogle;
     setUrlMapa(`https://maps.google.com/maps?saddr=${origenDir}&daddr=${destinoDir}&z=14&output=embed`);
@@ -208,16 +206,14 @@ export default function MapaPage() {
     if (nodoEncontrado) {
       ejecutarDijkstra("Nodo_A", nodoEncontrado);
     } else {
-      // Si el destino es fuera de Huancayo, permite buscarlo globalmente en todo el Perú
       const destinoGlobal = encodeURIComponent(destino + ", Peru");
       setUrlMapa(`https://maps.google.com/maps?q=${destinoGlobal}&z=13&output=embed`);
       setCaminoCalculado(`Buscando: ${destino}`);
-      setTiempoEstimated(`-- min`);
+      setTiempoEstimado(`-- min`);
       setCostoRuta(`-- Km`);
     }
   };
 
-  // RESTAURADA: Función para alertar y guardar incidentes en Supabase
   const handleCrearAlerta = async (tipo: string) => {
     if (!usuario) {
       alert("Debes iniciar sesión para reportar incidentes.");
@@ -272,21 +268,17 @@ export default function MapaPage() {
           </span>
           {usuario ? (
             <div className="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
-              <span className="text-xs font-semibold text-slate-200">
-                {getEmojiRol(usuario.rol)} {usuario.nombre}
-              </span>
+              <span className="text-xs font-semibold text-slate-200">{getEmojiRol(usuario.rol)} {usuario.nombre}</span>
               <button onClick={handleCerrarSesion} className="text-slate-400 hover:text-rose-400 font-bold text-xs">✕</button>
             </div>
           ) : (
-            <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">
-              Iniciar Sesión
-            </Link>
+            <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">Iniciar Sesión</Link>
           )}
         </div>
       </header>
 
       <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
-        {/* Barra de Búsqueda */}
+        {/* Buscador */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <form onSubmit={handleBuscarDestino} className="flex gap-2">
             <input 
@@ -296,9 +288,7 @@ export default function MapaPage() {
               onChange={(e) => setDestino(e.target.value)}
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
             />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-2 rounded-xl text-white">
-              Buscar
-            </button>
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-2 rounded-xl text-white">Buscar</button>
           </form>
           <button 
             type="button"
@@ -309,7 +299,7 @@ export default function MapaPage() {
           </button>
         </div>
 
-        {/* Panel de Métricas */}
+        {/* Métricas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
             <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
@@ -325,7 +315,7 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Fila de Geolocalización Activa */}
+        {/* Barra GPS */}
         <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
           <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Visor GPS Activo
@@ -335,7 +325,7 @@ export default function MapaPage() {
           </button>
         </div>
 
-        {/* Iframe de Google Maps */}
+        {/* Mapa original */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[400px]">
           <iframe
             src={urlMapa}
@@ -344,7 +334,7 @@ export default function MapaPage() {
             loading="lazy"
           ></iframe>
 
-          {/* Panel de Alternativas de Ruta */}
+          {/* Caja lateral de alternativas */}
           {rutaActiva.length > 0 && (
             <div className="absolute bottom-4 right-4 bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-2xl max-w-xs z-10">
               <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Alternativas de Ruta Generadas</h3>
@@ -364,7 +354,7 @@ export default function MapaPage() {
           )}
         </div>
 
-        {/* RESTAURADO: Panel Inferior de Alertas de Incidentes conectado con Supabase */}
+        {/* Alertas */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
