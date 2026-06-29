@@ -297,7 +297,7 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } filter {
+      } finally {
         setCargandoAlerta(false);
       }
     };
