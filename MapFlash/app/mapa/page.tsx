@@ -12,6 +12,10 @@ interface UsuarioSesion {
   email: string;
   rol: string;
   avatar_url?: string;
+  // Campos añadidos de billetera digital
+  billetera_tipo?: 'yape' | 'plin' | 'ambos' | '';
+  billetera_numero?: string;
+  billetera_qr_url?: string;
 }
 
 interface AlertaTrafico {
@@ -65,6 +69,11 @@ export default function MapaPage() {
   
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados añadidos para Yape / Plin
+  const [billeteraTipo, setBilleteraTipo] = useState<'yape' | 'plin' | 'ambos' | ''>('');
+  const [billeteraNumero, setBilleteraNumero] = useState('');
+  const [cargandoBilletera, setCargandoBilletera] = useState(false);
   
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce cualquier destino del Perú o selecciona un lugar guardado.');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
@@ -113,7 +122,13 @@ export default function MapaPage() {
 
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
-    if (sesionGuardada) setUsuario(JSON.parse(sesionGuardada));
+    if (sesionGuardada) {
+      const userParsed = JSON.parse(sesionGuardada);
+      setUsuario(userParsed);
+      // Sincronizar billetera con los inputs
+      setBilleteraTipo(userParsed.billetera_tipo || '');
+      setBilleteraNumero(userParsed.billetera_numero || '');
+    }
 
     const favoritosLocales = localStorage.getItem('favoritos_mapflash');
     if (favoritosLocales) {
@@ -180,6 +195,44 @@ export default function MapaPage() {
       const usuarioActualizado = { ...usuario, avatar_url: nuevaUrlAvatar };
       setUsuario(usuarioActualizado);
       localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
+    }
+  };
+
+  // Función añadida para persistir la billetera en Supabase
+  const handleGuardarBilletera = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usuario) return;
+
+    if (billeteraTipo && billeteraNumero.length !== 9) {
+      return alert("El número de teléfono celular en el Perú debe tener exactamente 9 dígitos.");
+    }
+
+    setCargandoBilletera(true);
+    try {
+      const { error } = await supabase
+        .from('perfiles')
+        .update({
+          billetera_tipo: billeteraTipo,
+          billetera_numero: billeteraNumero,
+        })
+        .eq('email', usuario.email);
+
+      if (error) throw error;
+
+      const usuarioActualizado = { 
+        ...usuario, 
+        billetera_tipo: billeteraTipo, 
+        billetera_numero: billeteraNumero 
+      };
+      
+      setUsuario(usuarioActualizado);
+      localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
+      alert("¡Billetera digital sincronizada con éxito! 📱");
+    } catch (err) {
+      console.error(err);
+      alert("Error al conectar con Supabase para actualizar los canales de pago.");
+    } finally {
+      setCandoBilletera(false);
     }
   };
 
@@ -408,15 +461,16 @@ export default function MapaPage() {
             <button onClick={() => setVerPerfilDetallado(true)} className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition text-left">
               <img src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} alt="Avatar" className="w-6 h-6 rounded-full border border-blue-500 object-cover" />
               <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
+              {usuario.billetera_tipo && <span className="text-[10px] bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1 rounded font-bold uppercase">{usuario.billetera_tipo}</span>}
             </button>
           )}
         </div>
       </header>
 
-      {/* MODAL PERFIL INTERACTIVO */}
+      {/* MODAL PERFIL INTERACTIVO CON BILLETERA DIGITAL */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
-          <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
+          <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between overflow-y-auto">
             <div>
               <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
                 <h2 className="text-md font-bold text-white">👤 Perfil de Conductor</h2>
@@ -462,8 +516,52 @@ export default function MapaPage() {
                   <input type="text" readOnly value={usuario.email} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none" />
                 </div>
               </div>
+
+              {/* SECCIÓN INTEGRADO: FORMULARIO DE CARTERA DIGITAL YAPE/PLIN */}
+              <div className="border-t border-slate-800 pt-4 mt-5">
+                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">📱 Cartera Digital Integrada</h3>
+                <form onSubmit={handleGuardarBilletera} className="flex flex-col gap-3">
+                  <div>
+                    <label className="block text-slate-400 text-[11px] font-medium mb-1">Selecciona tu pasarela preferida:</label>
+                    <select 
+                      value={billeteraTipo} 
+                      onChange={(e) => setBilleteraTipo(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 outline-none focus:border-purple-500"
+                    >
+                      <option value="">Ninguna / Solo Efectivo</option>
+                      <option value="yape">Yape</option>
+                      <option value="plin">Plin</option>
+                      <option value="ambos">Yape y Plin (Ambos)</option>
+                    </select>
+                  </div>
+
+                  {billeteraTipo && (
+                    <div className="animate-fadeIn">
+                      <label className="block text-slate-400 text-[11px] font-medium mb-1">Número de Celular Vinculado:</label>
+                      <input 
+                        type="text" 
+                        maxLength={9}
+                        placeholder="Ej: 987654321" 
+                        value={billeteraNumero} 
+                        onChange={(e) => setBilleteraNumero(e.target.value.replace(/\D/g, ''))}
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-mono outline-none focus:border-purple-500" 
+                      />
+                      <span className="text-[10px] text-slate-500 block mt-1">Este número será visible para que tus pasajeros realicen transferencias directas.</span>
+                    </div>
+                  )}
+
+                  <button 
+                    type="submit" 
+                    disabled={cargandoBilletera}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold py-2.5 rounded-xl transition mt-1 disabled:opacity-50 shadow-md shadow-purple-600/10"
+                  >
+                    {cargandoBilletera ? "Sincronizando..." : "Vincular Cuenta de Recaudo 💾"}
+                  </button>
+                </form>
+              </div>
             </div>
-            <button onClick={handleCerrarSesion} className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition">Cerrar Sesión</button>
+            
+            <button onClick={handleCerrarSesion} className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition mt-6">Cerrar Sesión</button>
           </div>
         </div>
       )}
@@ -488,7 +586,6 @@ export default function MapaPage() {
             </div>
           )}
 
-          {/* CORREGIDO: handleAgregarLugarFrecuente para evitar el crash de compilación */}
           {mostrarFormLugar && (
             <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1 w-full">
