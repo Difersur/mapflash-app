@@ -48,7 +48,7 @@ export default function MapaPage() {
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
-  const [rutaActiva, setRutaActiva] = useState<string[]>([]);
+  const [, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
@@ -76,7 +76,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`http://googleusercontent.com/maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -117,7 +117,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+        setUrlMapa(`http://googleusercontent.com/maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
       });
     }
   };
@@ -166,11 +166,11 @@ export default function MapaPage() {
     while (paso) { camino.unshift(paso); paso = previos[paso]; }
     
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
-    setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
+    setTiempoEstimated(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
+    setUrlMapa(`http://googleusercontent.com/maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
   };
 
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
@@ -202,13 +202,17 @@ export default function MapaPage() {
       const direccionDestinoQuery = encodeURIComponent(queryFinal);
       const zoom = esBusquedaExterna ? 8 : 14;
       
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
+      setUrlMapa(`http://googleusercontent.com/maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-      setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "Calculando...");
+      setTiempoEstimated(esBusquedaExterna ? "Calculando viaje interprovincial..." : "Calculando...");
       setCostoRuta("Variable");
       setRutaActiva(['Mi Ubicación', busqueda]);
     }
+  };
+
+  const setTiempoEstimated = (val: string) => {
+    setTiempoEstimado(val);
   };
 
   const handleCrearAlerta = async (tipo: string) => {
@@ -221,7 +225,7 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } finaly {
+      } finally {
         setCargandoAlerta(false);
       }
     };
