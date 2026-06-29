@@ -109,7 +109,7 @@ export default function MapaPage() {
     ],
     "tupac amaru": [
       { nombreEspecifico: "Avenida Túpac Amaru (Lima Norte)", direccionQuery: "Av. Tupac Amaru, Lima, Peru", descripcion: "Gran avenida troncal que conecta los distritos de Comas, Carabayllo e Independencia." },
-      { nombreEspecifico: "Avenida Túpac Amaru (El Tambo - Huancayo)", direccionQuery: "Av. Tupac Amaru, El Tambo, Huancayo", descripcion: "Vía principal en la zona norte de Huancayo." },
+      { nombreEspecifico: "Avenida Túpac Amaru (El Tambo - Huancayo)", direccionQuery: "Av. Túpac Amaru, El Tambo, Huancayo", descripcion: "Vía principal en la zona norte de Huancayo." },
       { nombreEspecifico: "Jirón Túpac Amaru (Puno)", direccionQuery: "Jiron Tupac Amaru, Puno, Peru", descripcion: "Calle urbana céntrica en la región de Puno." }
     ],
     "javier prado": [
@@ -223,12 +223,14 @@ export default function MapaPage() {
       
       setUsuario(usuarioActualizado);
       localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
+      
+      // CAMBIO CLAVE AQUÍ: Primero apagamos la carga para reactivar la UI
+      setCargandoBilletera(false);
       alert("¡Billetera digital sincronizada con éxito! 📱");
     } catch (err) {
       console.error(err);
-      alert("Error al conectar con Supabase para actualizar los canales de pago.");
-    } finally {
       setCargandoBilletera(false);
+      alert("Error al conectar con Supabase para actualizar los canales de pago.");
     }
   };
 
