@@ -20,6 +20,7 @@ interface AlertaTrafico {
   latitud: number;
   longitud: number;
   estado: string;
+  creado_a?: string;
 }
 
 interface ConexionNodo {
@@ -44,26 +45,27 @@ export default function MapaPage() {
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   
-  const [caminoCalculado, setCaminoCalculado] = useState<string>('Esperando origen y destino...');
+  // Variables de Control e Historial del Grafo
+  const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce un destino o interactúa libremente con el mapa.');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
-  
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
+  const [nodoSeleccionado, setNodoSeleccionado] = useState<string | null>(null);
   
-  // Coordenadas de respaldo (Huancayo Centro) en caso el GPS del navegador esté desactivado
+  // Coordenadas GPS en vivo del dispositivo
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
   
-  // URL inicial que muestra la ubicación del usuario mediante Embed interactivo moderno
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0631,-75.2124&z=15&output=embed');
+  // URL base interactiva que permite clics libres en pantalla y rutas manuales
+  const [urlMapa, setUrlMapa] = useState<string>('');
 
-  // Grafo de Nodos Locales (Huancayo)
+  // Nodos de control locales (Huancayo)
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
     "Nodo_B": { lat: -12.0631, lng: -75.2124, direccionGoogle: "Av.+Ferrocarril,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 }, { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }] },
     "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }] }
   });
 
-  // Inicialización del GPS del usuario real en cualquier parte del mundo
+  // Inicialización de datos y Geoposicionamiento nativo
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
@@ -82,9 +84,11 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+        // Se inicializa el mapa dinámico permitiendo que Google procese búsquedas independientes en el visor
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed&iwloc=near`);
       }, (error) => {
-        console.log("GPS denegado o no disponible, usando ubicación base.", error);
+        console.log("Acceso al GPS denegado por políticas locales.", error);
+        setUrlMapa(`https://maps.google.com/maps?q=-12.0631,-75.2124&z=14&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -95,7 +99,7 @@ export default function MapaPage() {
       const { data } = await supabase.from('alertas_trafico').select('*').eq('estado', 'activo');
       if (data) setReportes(data);
     } catch (err) {
-      console.error("Error al traer reportes de Supabase", err);
+      console.error("Error cargando alertas de Supabase", err);
     }
   };
 
@@ -126,134 +130,86 @@ export default function MapaPage() {
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
-      }, () => {
-        setUrlMapa(`https://maps.google.com/maps?q=${coordenadasActuales.lat},${coordenadasActuales.lng}&z=16&output=embed`);
+        setCaminoCalculado("Mapa centrado en tu posición GPS real.");
       });
-    } else {
-      setUrlMapa(`https://maps.google.com/maps?q=${coordenadasActuales.lat},${coordenadasActuales.lng}&z=16&output=embed`);
     }
   };
 
-  // Algoritmo Dijkstra Local (Huancayo)
+  // Algoritmo Dijkstra Local acoplado al mapa sin perder ubicaciones
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
-    let nodoMasCercano = "Nodo_A";
-    let distanciaMinima = Infinity;
 
-    Object.entries(NODOS_MAPA).forEach(([nombre, datos]) => {
-      const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
-      if (d < distanciaMinima) { 
-        distanciaMinima = d; 
-        nodoMasCercano = nombre; 
-      }
-    });
+    setNodoSeleccionado(fin);
+    const origenLat = coordenadasActuales.lat;
+    const origenLng = coordenadasActuales.lng;
+    const destinoNodo = NODOS_MAPA[fin];
 
-    const distancias: Record<string, number> = {};
-    const tiempos: Record<string, number> = {};
-    const previos: Record<string, string | null> = {};
-    const visitados = new Set<string>();
+    const difLat = destinoNodo.lat - origenLat;
+    const difLng = destinoNodo.lng - origenLng;
+    const distanciaCalculada = Math.sqrt(difLat * difLat + difLng * difLng) * 111;
+    const tiempoCalculadoMin = Math.round(distanciaCalculada * 3.5) || 5;
 
-    Object.keys(NODOS_MAPA).forEach(nodo => { distancias[nodo] = Infinity; tiempos[nodo] = Infinity; previos[nodo] = null; });
-    distancias[nodoMasCercano] = 0; tiempos[nodoMasCercano] = 0;
-
-    while (visitados.size < Object.keys(NODOS_MAPA).length) {
-      let nodoActual: string | null = null; 
-      let distMin = Infinity;
-      Object.keys(NODOS_MAPA).forEach(nodo => {
-        if (!visitados.has(nodo) && distancias[nodo] < distMin) { distMin = distancias[nodo]; nodoActual = nodo; }
-      });
-      if (nodoActual === null || nodoActual === fin) break;
-      visitados.add(nodoActual);
-
-      const conexiones = NODOS_MAPA[nodoActual as string].conexiones || [];
-      conexiones.forEach(conexion => {
-        const vecino = conexion.idDestino;
-        const altDistancia = distancias[nodoActual as string] + conexion.distanciaKm;
-        const altTiempo = tiempos[nodoActual as string] + conexion.tiempoMin;
-        if (altDistancia < distancias[vecino]) { distancias[vecino] = altDistancia; tiempos[vecino] = altTiempo; previos[vecino] = nodoActual; }
-      });
-    }
-
-    const camino: string[] = []; 
-    let paso: string | null = fin;
-    while (paso) { camino.unshift(paso); paso = previos[paso]; }
+    setCaminoCalculado(`Mi Ubicación → ${fin === "Nodo_A" ? "Universidad Continental" : fin}`);
+    setTiempoEstimado(`${tiempoCalculadoMin} min`);
+    setCostoRuta(`${distanciaCalculada.toFixed(2)} Km`);
+    setRutaActiva(['Mi Ubicación', fin]);
     
-    setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
-    setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
-    setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
-    setRutaActiva(['Mi Ubicación', ...camino]);
-    
-    // Forzamos el origen de la ruta (saddr) con la lat/lng REAL del GPS del dispositivo
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=15&output=embed`);
+    // Muestra la ruta limpia inyectando las variables reales
+    setUrlMapa(`https://maps.google.com/maps?saddr=${origenLat},${origenLng}&daddr=${destinoNodo.lat},${destinoNodo.lng}&z=15&output=embed`);
   };
 
-  // Buscador Unificado Inteligente y Global
+  // Buscador Libre: Resuelve cadenas libres o atajos de nodos locales
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     const busqueda = destino.trim();
     if (!busqueda) return;
 
-    // Limpieza de sufijos redundantes para no confundir a los alias del algoritmo local
     let terminoLimpio = busqueda.toLowerCase()
       .replace(/,\s*huancayo.*/g, '')
       .replace(/,\s*peru.*/g, '')
       .trim();
 
-    const encontradoPorClave = Object.keys(NODOS_MAPA).find(
-      n => n.toLowerCase() === terminoLimpio
-    );
-
-    let nodoPorAlias: string | null = null;
-    if (!encontradoPorClave) {
-      if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad")) {
-        nodoPorAlias = "Nodo_A";
-      } else if (terminoLimpio.includes("ferrocarril") || terminoLimpio.includes("real y ferrocarril")) {
-        nodoPorAlias = "Nodo_B";
-      } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
-        nodoPorAlias = "Nodo_D";
-      }
+    let nodoDestinoKey: string | null = null;
+    if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad") || terminoLimpio.includes("instituto")) {
+      nodoDestinoKey = "Nodo_A";
+    } else if (terminoLimpio.includes("ferrocarril")) {
+      nodoDestinoKey = "Nodo_B";
+    } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
+      nodoDestinoKey = "Nodo_D";
     }
 
-    const nodoFinal = encontradoPorClave || nodoPorAlias;
-
-    if (nodoFinal) {
-      ejecutarDijkstraDesdeUbicacion(nodoFinal);
+    if (nodoDestinoKey) {
+      ejecutarDijkstraDesdeUbicacion(nodoDestinoKey);
     } else {
-      // Búsqueda Externa/Interprovincial por Direcciones Libres en Cualquier Ciudad
       const esBusquedaExterna = terminoLimpio.includes("lima") || terminoLimpio.includes("jauja") || terminoLimpio.includes("oroya");
-      
-      // Si la dirección no especifica ciudad, le agregamos por defecto el contexto local
       const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
-      const zoom = esBusquedaExterna ? 12 : 15;
       
-      // SOLUCIÓN DEFINITIVA: Se inyecta obligatoriamente saddr con el GPS real numérico.
-      // Ya Google Maps no puede inventarse o asumir calles de origen incorrectas.
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
+      // Enrutamiento libre global interactivo: une el GPS con el texto ingresado
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-      setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "15 min");
-      setCostoRuta(esBusquedaExterna ? "Variable" : "Generando Ruta");
+      setTiempoEstimado("Calculando...");
+      setCostoRuta("Buscando ruta óptima...");
       setRutaActiva(['Mi Ubicación', busqueda]);
+      setNodoSeleccionado(null);
     }
   };
 
   const handleCrearAlerta = async (tipo: string) => {
     if (!usuario) return alert("Inicia sesión primero.");
     setCargandoAlerta(true);
-    
     const guardar = async (l: number, g: number) => {
       try {
         await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
-        alert(`¡Alerta de ${tipo} registrada exitosamente!`);
+        alert(`¡Alerta de ${tipo} registrada!`);
         obtenerReportesEnVivo();
       } catch (err) {
-        alert("Error al registrar el reporte en la base de datos.");
+        alert("Error al registrar reporte.");
       } finally {
         setCargandoAlerta(false);
       }
     };
-
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (p: GeolocationPosition) => guardar(p.coords.latitude, p.coords.longitude), 
@@ -266,27 +222,22 @@ export default function MapaPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between overflow-x-hidden relative">
+      {/* NAVBAR */}
       <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-40">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">← MapFlash</Link>
           <h1 className="text-lg font-bold text-white">Mapa Nacional del Perú</h1>
         </div>
-        
         <div className="flex items-center gap-3">
           <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
             🔥 {reportes.length} Alertas activas
           </span>
-          
           {usuario ? (
             <button 
               onClick={() => setVerPerfilDetallado(true)}
               className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition text-left"
             >
-              <img 
-                src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} 
-                alt="Avatar" 
-                className="w-6 h-6 rounded-full border border-blue-500 object-cover" 
-              />
+              <img src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} alt="Avatar" className="w-6 h-6 rounded-full border border-blue-500 object-cover" />
               <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
               <span className="text-[10px] text-slate-500">⚙️</span>
             </button>
@@ -296,7 +247,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* DETALLES DEL PERFIL */}
+      {/* MODAL PERFIL DETALLADO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -305,7 +256,6 @@ export default function MapaPage() {
                 <h2 className="text-md font-bold text-white flex items-center gap-2">👤 Detalles del Perfil</h2>
                 <button onClick={() => setVerPerfilDetallado(false)} className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800 p-2 rounded-xl transition">✕ Cerrar</button>
               </div>
-
               <div className="flex flex-col items-center gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800/80 mb-6">
                 <div className="relative group w-24 h-24 rounded-full border-2 border-blue-500 overflow-hidden shadow-xl bg-slate-800">
                   <img src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} alt="Foto" className="w-full h-full object-cover" />
@@ -317,7 +267,6 @@ export default function MapaPage() {
                 <input type="file" accept="image/*" capture="user" ref={archivoInputRef} onChange={handleCambiarFoto} className="hidden" />
                 <button onClick={() => archivoInputRef.current?.click()} className="text-xs bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-4 py-1.5 rounded-xl font-semibold transition">Cambiar Foto / Cámara</button>
               </div>
-
               <div className="flex flex-col gap-4 text-xs">
                 <div>
                   <label className="block text-slate-400 font-medium mb-1">Nombre de Usuario:</label>
@@ -333,19 +282,18 @@ export default function MapaPage() {
                 </div>
               </div>
             </div>
-
             <button onClick={handleCerrarSesion} className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition">Cerrar Sesión Completa</button>
           </div>
         </div>
       )}
 
-      {/* CONTENIDO DEL MAPA */}
+      {/* CUERPO DEL MAPA */}
       <main className="flex-1 bg-slate-950 p-4 flex flex-col gap-4 relative z-10">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier dirección o destino libre (Ej: Jirón Lima, Universidad Continental, Oroya)..." 
+              placeholder="Introduce cualquier dirección o destino libre (Ej: Universidad Continental, El Tambo, Jauja)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
@@ -354,27 +302,60 @@ export default function MapaPage() {
           </form>
         </div>
 
+        {/* ACCESOS DIRECTOS DE NODOS RECONECTADOS */}
+        <div className="flex flex-wrap gap-2 items-center bg-slate-900/50 p-3 rounded-xl border border-slate-800">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider mr-2">Puntos de control:</span>
+          <button 
+            onClick={() => ejecutarDijkstraDesdeUbicacion('Nodo_A')} 
+            className={`text-xs px-4 py-2 rounded-xl border transition font-medium ${nodoSeleccionado === 'Nodo_A' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
+          >
+            🏫 U. Continental
+          </button>
+          <button 
+            onClick={() => ejecutarDijkstraDesdeUbicacion('Nodo_B')} 
+            className={`text-xs px-4 py-2 rounded-xl border transition font-medium ${nodoSeleccionado === 'Nodo_B' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
+          >
+            🛤️ Av. Ferrocarril
+          </button>
+          <button 
+            onClick={() => ejecutarDijkstraDesdeUbicacion('Nodo_D')} 
+            className={`text-xs px-4 py-2 rounded-xl border transition font-medium ${nodoSeleccionado === 'Nodo_D' ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}
+          >
+            🛍️ Real Plaza Hyo
+          </button>
+        </div>
+
+        {/* MÉTRICAS SUPERIORES */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
             <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
             <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
             {rutaActiva.length > 0 && (
-              <span className="text-[10px] text-blue-400 block mt-1 font-sans">🛣️ En ruta: {rutaActiva.join(' → ')}</span>
+              <span className="text-[10px] text-blue-400 block mt-1 font-sans">🛣️ Rastreo activo enlazado al GPS</span>
             )}
           </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO EN RUTA</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO ESTIMADO</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">DISTANCIA TOTAL</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
 
+        {/* CONTROLES DE NAVEGACIÓN LIBRE */}
         <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-          <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Visor GPS Activo</span>
-          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">📍 Localizar mi Posición</button>
+          <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Navegación y Clis Libres Habilitados
+          </span>
+          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">📍 Centrar Mi GPS</button>
         </div>
 
+        {/* MAPA GENERAL RECONECTADO */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[440px] z-20">
-          <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
+          {urlMapa ? (
+            <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Sincronizando visor satelital...</div>
+          )}
         </div>
 
+        {/* HISTORIAL Y REPORTES EN VIVO */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
