@@ -54,7 +54,7 @@ export default function MapaPage() {
   });
 
   const [urlMapa, setUrlMapa] = useState<string>(
-    `https://www.google.com/maps/embed/v1/view?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}&center=-12.0674,-75.2102&zoom=15`
+    `https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed`
   );
 
   // Tus nodos originales intactos
@@ -93,7 +93,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://www.google.com/maps?saddr=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -120,7 +120,7 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`https://www.google.com/maps?saddr=${lat},${lng}&z=16&output=embed`);
+          setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&z=16&output=embed`);
         },
         () => {
           alert("No se pudo acceder a tu ubicación actual.");
@@ -196,12 +196,13 @@ export default function MapaPage() {
     }
 
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
-    setTiempoEstimado(`${tiempos[fin] !== Infinity ? tiempos[fin] : 12} min`);
+    setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
     const destinoTarget = NODOS_MAPA[fin];
-    setUrlMapa(`https://www.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
+    // Ambos marcadores obligatorios mediante saddr y daddr con template literals correctos
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
   };
 
   // CONTROLADOR UNIFICADO DE BÚSQUEDA
@@ -218,10 +219,11 @@ export default function MapaPage() {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
       const destinoTerm = encodeURIComponent(destino + ", Huancayo");
-      setUrlMapa(`https://www.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
+      // Ambos marcadores obligatorios mediante saddr y daddr en la búsqueda libre
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
-      setTiempoEstimado(`14 min`);
-      setCostoRuta(`4.2 Km`);
+      setTiempoEstimado("14 min");
+      setCostoRuta("4.2 Km");
       setRutaActiva(['Mi Ubicación', destino]);
     }
   };
@@ -278,9 +280,25 @@ export default function MapaPage() {
             🔥 {reportes.length} Alertas activas
           </span>
           {usuario ? (
-            <div className="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
-              <span className="text-xs font-semibold text-slate-200">👤 {usuario.nombre}</span>
-              <button onClick={handleCerrarSesion} className="text-slate-400 hover:text-rose-400 font-bold text-xs">✕</button>
+            <div 
+              onClick={() => alert(`Perfil de ${usuario.nombre}\nEmail: ${usuario.email}\nRol: ${usuario.rol}`)}
+              className="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700 transition"
+            >
+              {usuario.avatar_url ? (
+                <img src={usuario.avatar_url} alt="Avatar" className="w-5 h-5 rounded-full object-cover" />
+              ) : (
+                <span className="text-xs">👤</span>
+              )}
+              <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // Evita que se dispare el click del perfil contenedor
+                  handleCerrarSesion();
+                }} 
+                className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1"
+              >
+                ✕
+              </button>
             </div>
           ) : (
             <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">Iniciar Sesión</Link>
