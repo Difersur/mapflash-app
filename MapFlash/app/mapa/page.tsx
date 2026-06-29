@@ -12,7 +12,6 @@ interface UsuarioSesion {
   email: string;
   rol: string;
   avatar_url?: string;
-  // Campos añadidos de billetera digital
   billetera_tipo?: 'yape' | 'plin' | 'ambos' | '';
   billetera_numero?: string;
   billetera_qr_url?: string;
@@ -70,7 +69,6 @@ export default function MapaPage() {
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados añadidos para Yape / Plin
   const [billeteraTipo, setBilleteraTipo] = useState<'yape' | 'plin' | 'ambos' | ''>('');
   const [billeteraNumero, setBilleteraNumero] = useState('');
   const [cargandoBilletera, setCargandoBilletera] = useState(false);
@@ -125,7 +123,6 @@ export default function MapaPage() {
     if (sesionGuardada) {
       const userParsed = JSON.parse(sesionGuardada);
       setUsuario(userParsed);
-      // Sincronizar billetera con los inputs
       setBilleteraTipo(userParsed.billetera_tipo || '');
       setBilleteraNumero(userParsed.billetera_numero || '');
     }
@@ -158,7 +155,7 @@ export default function MapaPage() {
         }
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, () => {
-        setUrlMapa(`https://maps.google.com/maps?q=-12.0464,-77.0428&z=6&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=-12.0464,-77.0428&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -198,7 +195,6 @@ export default function MapaPage() {
     }
   };
 
-  // Función añadida para persistir la billetera en Supabase
   const handleGuardarBilletera = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usuario) return;
@@ -232,7 +228,7 @@ export default function MapaPage() {
       console.error(err);
       alert("Error al conectar con Supabase para actualizar los canales de pago.");
     } finally {
-      setCandoBilletera(false);
+      setCargandoBilletera(false);
     }
   };
 
@@ -424,6 +420,7 @@ export default function MapaPage() {
   const handleCreateAlerta = async (tipo: string) => {
     if (!usuario) return alert("Inicia sesión primero para reportar un incidente.");
     setCargandoAlerta(true);
+    
     const guardar = async (l: number, g: number) => {
       try {
         await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
@@ -435,10 +432,11 @@ export default function MapaPage() {
         setCargandoAlerta(false);
       }
     };
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (p: GeolocationPosition) => guardar(p.coords.latitude, p.coords.longitude), 
-        () => guardar(coordenadasActuales.lat, coordenadasActuales.lng)
+        (p: GeolocationPosition) => { guardar(p.coords.latitude, p.coords.longitude); }, 
+        () => { guardar(coordenadasActuales.lat, coordenadasActuales.lng); }
       );
     } else { 
       guardar(coordenadasActuales.lat, coordenadasActuales.lng); 
@@ -467,7 +465,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* MODAL PERFIL INTERACTIVO CON BILLETERA DIGITAL */}
+      {/* MODAL PERFIL INTERACTIVO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between overflow-y-auto">
@@ -517,7 +515,7 @@ export default function MapaPage() {
                 </div>
               </div>
 
-              {/* SECCIÓN INTEGRADO: FORMULARIO DE CARTERA DIGITAL YAPE/PLIN */}
+              {/* CARTERA DIGITAL */}
               <div className="border-t border-slate-800 pt-4 mt-5">
                 <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">📱 Cartera Digital Integrada</h3>
                 <form onSubmit={handleGuardarBilletera} className="flex flex-col gap-3">
@@ -536,7 +534,7 @@ export default function MapaPage() {
                   </div>
 
                   {billeteraTipo && (
-                    <div className="animate-fadeIn">
+                    <div>
                       <label className="block text-slate-400 text-[11px] font-medium mb-1">Número de Celular Vinculado:</label>
                       <input 
                         type="text" 
