@@ -41,7 +41,6 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
   
-  // Estado para controlar la ventana flotante del perfil completo
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   
@@ -51,7 +50,11 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
+  
+  // URL Inicial apuntando por defecto a Huancayo de forma segura
+  const [urlMapa, setUrlMapa] = useState<string>(
+    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed'
+  );
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -95,7 +98,6 @@ export default function MapaPage() {
     window.location.href = '/';
   };
 
-  // Manejo de la subida o captura de foto de perfil
   const handleCambiarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && usuario) {
@@ -157,22 +159,39 @@ export default function MapaPage() {
 
     const camino: string[] = []; let paso: string | null = fin;
     while (paso) { camino.unshift(paso); paso = previos[paso]; }
+    
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
     setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
-    setUrlMapa(`https://maps.google.com/maps?q=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
+    
+    // Renderiza la ruta exacta entre origen y el nodo objetivo en Google Maps embed nativo
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
   };
 
+  // BUSCADOR MEJORADO UNIVERSAL PARA CUALQUIER DIRECCIÓN
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!destino) return;
-    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => n.toLowerCase().includes(destino.toLowerCase()));
+    if (!destino.trim()) return;
+
+    // 1. Intentar buscar primero si el usuario escribió un nodo conocido
+    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
+      n.toLowerCase().includes(destino.toLowerCase()) ||
+      NODOS_MAPA[n].direccionGoogle.toLowerCase().includes(destino.toLowerCase().replace(/ /g, "+"))
+    );
+
     if (nodoEncontrado) {
-      ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
+      ejecutarDijkstraDesdeUbicacion(nodoEnFound);
     } else {
-      setUrlMapa(`https://maps.google.com/maps?q=${encodeURIComponent(destino + ", Huancayo")}&z=14&output=embed`);
+      // 2. BUSCADOR LIBRE: Si es cualquier otra dirección del mapa, estructurar la petición para que Google la encuentre
+      const direccionDestinoQuery = encodeURIComponent(destino + ", Huancayo, Peru");
+      
+      // Cambiamos el mapa para pintar la trayectoria desde donde estás hasta la dirección libre escrita
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=14&output=embed`);
+      
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
+      setTiempoEstimado("Calculando...");
+      setCostoRuta("Variable");
       setRutaActiva(['Mi Ubicación', destino]);
     }
   };
@@ -194,7 +213,6 @@ export default function MapaPage() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between overflow-x-hidden relative">
       
-      {/* CABECERA PRINCIPAL */}
       <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-40">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">← MapFlash</Link>
@@ -209,7 +227,7 @@ export default function MapaPage() {
           {usuario ? (
             <button 
               onClick={() => setVerPerfilDetallado(true)}
-              className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none z-50 text-left"
+              className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition text-left"
             >
               <img 
                 src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} 
@@ -225,53 +243,32 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* MODAL / VENTANA LATERAL FLOTANTE DE PERFIL (CON CÁMARA / SUBIDA DE FOTO) */}
+      {/* VENTANA DE PERFIL */}
       {verPerfilDetallado && usuario && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
+          <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
                 <h2 className="text-md font-bold text-white flex items-center gap-2">👤 Detalles del Perfil</h2>
                 <button onClick={() => setVerPerfilDetallado(false)} className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800 p-2 rounded-xl transition">✕ Cerrar</button>
               </div>
 
-              {/* CONTENEDOR DE FOTO INTERACTIVO */}
               <div className="flex flex-col items-center gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800/80 mb-6">
                 <div className="relative group w-24 h-24 rounded-full border-2 border-blue-500 overflow-hidden shadow-xl bg-slate-800">
-                  <img 
-                    src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} 
-                    alt="Foto Grande" 
-                    className="w-full h-full object-cover" 
-                  />
-                  <div 
-                    onClick={() => archivoInputRef.current?.click()}
-                    className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
-                  >
+                  <img src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} alt="Foto Grande" className="w-full h-full object-cover" />
+                  <div onClick={() => archivoInputRef.current?.click()} className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
                     <span className="text-[18px]">📷</span>
                     <span className="text-[10px] text-slate-300 font-semibold uppercase text-center px-1">Subir / Tomar</span>
                   </div>
                 </div>
-                <input 
-                  type="file" 
-                  accept="image/*" 
-                  capture="user" // Habilita la cámara frontal directamente en celulares
-                  ref={archivoInputRef} 
-                  onChange={handleCambiarFoto} 
-                  className="hidden" 
-                />
-                <button 
-                  onClick={() => archivoInputRef.current?.click()}
-                  className="text-xs bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-4 py-1.5 rounded-xl font-semibold transition"
-                >
-                  Cambiar Foto o Usar Cámara
-                </button>
+                <input type="file" accept="image/*" capture="user" ref={archivoInputRef} onChange={handleCambiarFoto} className="hidden" />
+                <button onClick={() => archivoInputRef.current?.click()} className="text-xs bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-4 py-1.5 rounded-xl font-semibold transition">Cambiar Foto o Usar Cámara</button>
               </div>
 
-              {/* CAMPOS DEL FORMULARIO DEL USUARIO */}
               <div className="flex flex-col gap-4 text-xs">
                 <div>
                   <label className="block text-slate-400 font-medium mb-1">Nombre de Usuario:</label>
-                  <input type="text" readOnly value={usuario.nombre} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none font-medium" />
+                  <input type="text" readOnly value={usuario.nombre} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none" />
                 </div>
                 <div>
                   <label className="block text-slate-400 font-medium mb-1">Correo Electrónico:</label>
@@ -284,12 +281,7 @@ export default function MapaPage() {
               </div>
             </div>
 
-            <button 
-              onClick={handleCerrarSesion}
-              className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition"
-            >
-              Cerrar Sesión Completa
-            </button>
+            <button onClick={handleCerrarSesion} className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition">Cerrar Sesión Completa</button>
           </div>
         </div>
       )}
@@ -298,8 +290,14 @@ export default function MapaPage() {
       <main className="flex-1 bg-slate-950 p-4 flex flex-col gap-4 relative z-10">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
-            <input type="text" placeholder="Introduce tu destino (ej. Universidad Continental / Real Plaza / Nodo_D)..." value={destino} onChange={(e) => setDestino(e.target.value)} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition active:scale-95">Buscar y Calcular Ruta con Dijkstra →</button>
+            <input 
+              type="text" 
+              placeholder="Introduce cualquier destino o dirección (ej. Atalaya y real, Av. Giráldez, Real Plaza)..." 
+              value={destino} 
+              onChange={(e) => setDestino(e.target.value)} 
+              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
+            />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition active:scale-95">Buscar Ubicación 🔍</button>
           </form>
         </div>
 
@@ -316,14 +314,6 @@ export default function MapaPage() {
 
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[440px] z-20">
           <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
-          {rutaActiva.length > 0 && (
-            <div className="absolute bottom-4 right-4 bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-2xl max-w-xs z-30">
-              <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Alternativas Generadas</h3>
-              <div className="flex flex-col gap-2 text-[11px]">
-                <div className="bg-slate-950 p-2 rounded border border-emerald-500/30"><span className="text-emerald-400 font-bold">🟢 Ruta Óptima (Dijkstra):</span><p className="text-slate-300 font-mono mt-0.5">{rutaActiva.join(' → ')}</p></div>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
