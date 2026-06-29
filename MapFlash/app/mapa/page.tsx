@@ -50,10 +50,10 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   
-  // Coordenadas iniciales por defecto (Huancayo Centro como respaldo si el GPS está apagado)
+  // Coordenadas de respaldo (Huancayo Centro) en caso el GPS del navegador esté desactivado
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
   
-  // URL inicial segura del iframe
+  // URL inicial que muestra la ubicación del usuario mediante Embed interactivo moderno
   const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0631,-75.2124&z=15&output=embed');
 
   // Grafo de Nodos Locales (Huancayo)
@@ -63,7 +63,7 @@ export default function MapaPage() {
     "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }] }
   });
 
-  // Efecto de inicialización: Obtiene el GPS real del usuario en cualquier parte del mundo
+  // Inicialización del GPS del usuario real en cualquier parte del mundo
   useEffect(() => {
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
@@ -78,13 +78,13 @@ export default function MapaPage() {
     }
     
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
+      navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
       }, (error) => {
-        console.log("GPS no disponible, usando ubicación base predeterminada.", error);
+        console.log("GPS denegado o no disponible, usando ubicación base.", error);
       });
     }
     obtenerReportesEnVivo();
@@ -121,7 +121,7 @@ export default function MapaPage() {
 
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((position) => {
+      navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
@@ -134,13 +134,12 @@ export default function MapaPage() {
     }
   };
 
-  // Algoritmo Dijkstra Local
+  // Algoritmo Dijkstra Local (Huancayo)
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
     let nodoMasCercano = "Nodo_A";
     let distanciaMinima = Infinity;
 
-    // Buscar el nodo del grafo más cercano a la ubicación GPS actual
     Object.entries(NODOS_MAPA).forEach(([nombre, datos]) => {
       const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
       if (d < distanciaMinima) { 
@@ -184,28 +183,26 @@ export default function MapaPage() {
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    // Forzar origen saddr desde tus coordenadas reales hacia el nodo local exacto
+    // Forzamos el origen de la ruta (saddr) con la lat/lng REAL del GPS del dispositivo
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=15&output=embed`);
   };
 
-  // Buscador Unificado Inteligente Anti-Errores Globales
+  // Buscador Unificado Inteligente y Global
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     const busqueda = destino.trim();
     if (!busqueda) return;
 
-    // Normalizamos el texto quitando ", huancayo" o ", peru" para no romper los alias locales
+    // Limpieza de sufijos redundantes para no confundir a los alias del algoritmo local
     let terminoLimpio = busqueda.toLowerCase()
       .replace(/,\s*huancayo.*/g, '')
       .replace(/,\s*peru.*/g, '')
       .trim();
 
-    // 1. Validar si coincide con un ID de nodo directo
     const encontradoPorClave = Object.keys(NODOS_MAPA).find(
       n => n.toLowerCase() === terminoLimpio
     );
 
-    // 2. Validar coincidencias por palabras clave de alias locales
     let nodoPorAlias: string | null = null;
     if (!encontradoPorClave) {
       if (terminoLimpio.includes("continental") || terminoLimpio.includes("universidad")) {
@@ -220,22 +217,23 @@ export default function MapaPage() {
     const nodoFinal = encontradoPorClave || nodoPorAlias;
 
     if (nodoFinal) {
-      // Si el destino está en Huancayo dentro de nuestro grafo, corre Dijkstra
       ejecutarDijkstraDesdeUbicacion(nodoFinal);
     } else {
-      // Si es una búsqueda externa/interprovincial (Lima, Jauja, Oroya, etc.)
+      // Búsqueda Externa/Interprovincial por Direcciones Libres en Cualquier Ciudad
       const esBusquedaExterna = terminoLimpio.includes("lima") || terminoLimpio.includes("jauja") || terminoLimpio.includes("oroya");
       
+      // Si la dirección no especifica ciudad, le agregamos por defecto el contexto local
       const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
       const zoom = esBusquedaExterna ? 12 : 15;
       
-      // SOLUCIÓN AL BUG: Forzar origen saddr con coordenadas GPS numéricas reales del usuario
+      // SOLUCIÓN DEFINITIVA: Se inyecta obligatoriamente saddr con el GPS real numérico.
+      // Ya Google Maps no puede inventarse o asumir calles de origen incorrectas.
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
       setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "15 min");
-      setCostoRuta(esBusquedaExterna ? "Variable" : "3.5 Km");
+      setCostoRuta(esBusquedaExterna ? "Variable" : "Generando Ruta");
       setRutaActiva(['Mi Ubicación', busqueda]);
     }
   };
@@ -250,7 +248,7 @@ export default function MapaPage() {
         alert(`¡Alerta de ${tipo} registrada exitosamente!`);
         obtenerReportesEnVivo();
       } catch (err) {
-        alert("Error al registrar reporte.");
+        alert("Error al registrar el reporte en la base de datos.");
       } finally {
         setCargandoAlerta(false);
       }
@@ -258,7 +256,7 @@ export default function MapaPage() {
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (p) => guardar(p.coords.latitude, p.coords.longitude), 
+        (p: GeolocationPosition) => guardar(p.coords.latitude, p.coords.longitude), 
         () => guardar(coordenadasActuales.lat, coordenadasActuales.lng)
       );
     } else { 
@@ -268,7 +266,6 @@ export default function MapaPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between overflow-x-hidden relative">
-      
       <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-40">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">← MapFlash</Link>
@@ -299,7 +296,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* VENTANA DE PERFIL DETALLADO */}
+      {/* DETALLES DEL PERFIL */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -311,14 +308,14 @@ export default function MapaPage() {
 
               <div className="flex flex-col items-center gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800/80 mb-6">
                 <div className="relative group w-24 h-24 rounded-full border-2 border-blue-500 overflow-hidden shadow-xl bg-slate-800">
-                  <img src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} alt="Foto Grande" className="w-full h-full object-cover" />
+                  <img src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} alt="Foto" className="w-full h-full object-cover" />
                   <div onClick={() => archivoInputRef.current?.click()} className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
                     <span className="text-[18px]">📷</span>
-                    <span className="text-[10px] text-slate-300 font-semibold uppercase text-center px-1">Subir / Tomar</span>
+                    <span className="text-[10px] text-slate-300 font-semibold uppercase text-center px-1">Subir Foto</span>
                   </div>
                 </div>
                 <input type="file" accept="image/*" capture="user" ref={archivoInputRef} onChange={handleCambiarFoto} className="hidden" />
-                <button onClick={() => archivoInputRef.current?.click()} className="text-xs bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-4 py-1.5 rounded-xl font-semibold transition">Cambiar Foto o Usar Cámara</button>
+                <button onClick={() => archivoInputRef.current?.click()} className="text-xs bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-4 py-1.5 rounded-xl font-semibold transition">Cambiar Foto / Cámara</button>
               </div>
 
               <div className="flex flex-col gap-4 text-xs">
@@ -342,13 +339,13 @@ export default function MapaPage() {
         </div>
       )}
 
-      {/* CUERPO PRINCIPAL */}
+      {/* CONTENIDO DEL MAPA */}
       <main className="flex-1 bg-slate-950 p-4 flex flex-col gap-4 relative z-10">
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier destino nacional o local (ej. Universidad Continental, Lima, Jauja)..." 
+              placeholder="Introduce cualquier dirección o destino libre (Ej: Jirón Lima, Universidad Continental, Oroya)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
@@ -366,7 +363,7 @@ export default function MapaPage() {
             )}
           </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO EN RUTA</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">COSTO DE LLEGADA</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">DISTANCIA TOTAL</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
 
         <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
