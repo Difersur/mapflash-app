@@ -28,11 +28,11 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
 
-  // 🗺️ CONFIGURACIÓN NACIONAL: Vista general de todo el Perú al iniciar
+  // Coordenadas generales del Perú al iniciar
   const [centroMapa, setCentroMapa] = useState({
-    lat: -9.1900, 
-    lng: -75.0152,
-    zoom: 5 
+    lat: -12.046374, 
+    lng: -77.042793,
+    zoom: 13 
   });
 
   useEffect(() => {
@@ -65,7 +65,6 @@ export default function MapaPage() {
     return '👤';
   };
 
-  // Mueve el mapa dinámicamente a donde esté el usuario en tiempo real
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -77,11 +76,9 @@ export default function MapaPage() {
           });
         },
         () => {
-          alert("No se pudo acceder a tu ubicación actual. Por favor, activa los permisos de GPS.");
+          alert("No se pudo acceder a tu ubicación actual.");
         }
       );
-    } else {
-      alert("Tu navegador no soporta geolocalización.");
     }
   };
 
@@ -164,7 +161,6 @@ export default function MapaPage() {
                   {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
                 </span>
                 
-                {/* Miniatura de la foto de perfil en barra superior */}
                 {usuario.avatar_url ? (
                   <img 
                     src={usuario.avatar_url} 
@@ -194,7 +190,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* Contenedor Principal del Mapa */}
+      {/* Contenedor Principal */}
       <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
         
         {/* Barra de Búsqueda Superior */}
@@ -247,10 +243,10 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Contenedor del Mapa Físico */}
+        {/* Contenedor interactivo del mapa */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           
-          {/* ✅ URL CORREGIDA NATIVA DE GOOGLE MAPS EMBED */}
+          {/* AQUÍ VA TU COMPONENTE DINÁMICO DE MAPA CON TUS NODOS Y RUTAS DE DIJKSTRA */}
           <iframe
             src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
