@@ -128,19 +128,35 @@ export default function MapaPage() {
             🔥 {reportes.length} Alertas activas
           </span>
           
-          {/* PARTE RESTAURADA: Ahora el botón del usuario vuelve a ser un enlace clickeable a tu página de perfil */}
           {usuario ? (
-            <div className="flex items-center gap-2 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+            <div className="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+              {/* Contenedor del enlace que agrupa Nombre + Miniatura */}
               <Link 
                 href="/perfil" 
-                className="text-xs font-semibold text-slate-200 hover:text-blue-400 transition flex items-center gap-1"
+                className="flex flex-col items-end gap-1 group"
                 title="Ver mi Perfil y Agregar Fotos"
               >
-                {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
+                <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-400 transition flex items-center gap-1">
+                  {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
+                </span>
+                
+                {/* 📸 MODIFICACIÓN: Renderizado de la foto en miniatura */}
+                {usuario.avatar_url ? (
+                  <img 
+                    src={usuario.avatar_url} 
+                    alt="Miniatura de perfil" 
+                    className="w-7 h-7 rounded-full object-cover border border-slate-600 shadow group-hover:border-blue-400 transition"
+                  />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs border border-slate-600 group-hover:border-blue-400 transition">
+                    {getEmojiRol(usuario.rol)}
+                  </div>
+                )}
               </Link>
+
               <button 
                 onClick={handleCerrarSesion}
-                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs"
+                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs self-center"
                 title="Cerrar Sesión"
               >
                 ✕
@@ -160,7 +176,7 @@ export default function MapaPage() {
           
           {/* MAPA DINÁMICO */}
           <iframe
-            src={`http://googleusercontent.com/maps.google.com/6{centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
+            src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen={true}
             loading="lazy"
