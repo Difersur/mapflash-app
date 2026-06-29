@@ -111,7 +111,7 @@ export default function MapaPage() {
       const porDefecto: LugarGuardado[] = [
         { id: '1', nombre: 'Plaza de Armas de Lima', direccionQuery: 'Plaza de Armas de Lima, Peru', icono: '🏛️' },
         { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Peru', icono: '🛍️' },
-        { id: '3', font: '', nombre: 'Mall Plaza Arequipa', direccionQuery: 'Mall Plaza, Arequipa, Peru', icono: '🏢' }
+        { id: '3', nombre: 'Mall Plaza Arequipa', direccionQuery: 'Mall Plaza, Arequipa, Peru', icono: '🏢' }
       ];
       setLugaresGuardados(porDefecto);
       localStorage.setItem('favoritos_mapflash', JSON.stringify(porDefecto));
@@ -154,14 +154,12 @@ export default function MapaPage() {
     window.location.href = '/';
   };
 
-  // Función para activar el input de archivo oculto
   const abrirSelectorDeArchivo = () => {
     if (archivoInputRef.current) {
       archivoInputRef.current.click();
     }
   };
 
-  // Función que procesa el cambio de archivo y renderiza la foto en el perfil
   const handleCambiarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
     const archivos = e.target.files;
     if (archivos && archivos.length > 0 && usuario) {
@@ -363,7 +361,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* MODAL PERFIL CON SISTEMA PARA AGREGAR/CAMBIAR FOTO HABILITADO */}
+      {/* MODAL PERFIL INTERACTIVO COMPLETO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -394,7 +392,6 @@ export default function MapaPage() {
                   📸 Subir / Cambiar Foto
                 </button>
                 
-                {/* Input nativo de archivos (Oculto) */}
                 <input 
                   type="file" 
                   ref={archivoInputRef} 
