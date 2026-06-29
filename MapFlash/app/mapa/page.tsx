@@ -134,7 +134,6 @@ export default function MapaPage() {
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
 
-    // Buscamos el nodo más cercano a tu posición actual para aproximar el peso del grafo
     let nodoMasCercano = "Nodo_A";
     let distanciaMinima = Infinity;
 
@@ -196,11 +195,11 @@ export default function MapaPage() {
     }
 
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
-    setTiempoEstimated(`${tiempos[fin] !== Infinity ? tiempos[fin] : 11} min`);
+    // CORREGIDO: Se cambió setTiempoEstimated por setTiempoEstimado para arreglar el Type Error
+    setTiempoEstimado(`${tiempos[fin] !== Infinity ? tiempos[fin] : 11} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 2.4} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    // Google Maps traza el camino usando tus coordenadas exactas como origen 'saddr'
     const destinoDir = NODOS_MAPA[fin].direccionGoogle;
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoDir}&z=14&output=embed`);
   };
@@ -220,7 +219,7 @@ export default function MapaPage() {
       const destinoGlobal = encodeURIComponent(destino + ", Huancayo");
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoGlobal}&z=14&output=embed`);
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
-      setTiempoEstimated(`11 min`);
+      setTiempoEstimado(`11 min`);
       setCostoRuta(`2.4 Km`);
       setRutaActiva(['Mi Ubicación', destino]);
     }
@@ -307,7 +306,7 @@ export default function MapaPage() {
             onClick={() => ejecutarDijkstraDesdeUbicacion("Nodo_D")}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-sm"
           >
-            Calcular ruta óptima desde mi ubicación con Dijkstra →
+            Calcular ruta óptma desde mi ubicación con Dijkstra →
           </button>
         </div>
 
