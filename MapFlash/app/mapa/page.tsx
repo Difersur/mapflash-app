@@ -26,13 +26,13 @@ export default function MapaPage() {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null);
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
-  const [destino, setDestino] = useState(''); // Estado para la barra de búsqueda
+  const [destino, setDestino] = useState('');
 
-  // Coordenadas iniciales por defecto en Huancayo, Perú
+  // Coordenadas originales de tu primera imagen (Lima)
   const [centroMapa, setCentroMapa] = useState({
-    lat: -12.06513, 
-    lng: -75.20486,
-    zoom: 14 
+    lat: -12.05, 
+    lng: -77.04,
+    zoom: 13 
   });
 
   useEffect(() => {
@@ -65,7 +65,6 @@ export default function MapaPage() {
     return '👤';
   };
 
-  // Función específica para el botón "Localizar mi Posición"
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -77,11 +76,9 @@ export default function MapaPage() {
           });
         },
         () => {
-          alert("No se pudo acceder a tu ubicación actual. Verifica los permisos de tu navegador.");
+          alert("No se pudo acceder a tu ubicación actual.");
         }
       );
-    } else {
-      alert("Tu navegador no soporta geolocalización.");
     }
   };
 
@@ -92,8 +89,8 @@ export default function MapaPage() {
     }
     setCargandoAlerta(true);
     
-    let lat = -12.06513;
-    let lng = -75.20486;
+    let lat = -12.05;
+    let lng = -77.04;
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -132,12 +129,8 @@ export default function MapaPage() {
     setCentroMapa({ lat, lng, zoom: 17 }); 
   };
 
-  // Función para simular o procesar la búsqueda de destino con el autómata
   const handleBuscarDestino = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!destino.trim()) return;
-    alert(`Buscando ruta hacia: ${destino}`);
-    // Aquí puedes integrar tu lógica de Dijkstra pasándole el destino
   };
 
   return (
@@ -149,7 +142,7 @@ export default function MapaPage() {
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">
             ← MapFlash
           </Link>
-          <h1 className="text-lg font-bold text-white tracking-tight">Mapa de Huancayo</h1>
+          <h1 className="text-lg font-bold text-white tracking-tight">Mapa Nacional del Perú</h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -162,20 +155,20 @@ export default function MapaPage() {
               <Link 
                 href="/perfil" 
                 className="flex flex-col items-end gap-1 group"
-                title="Ver mi Perfil y Agregar Fotos"
+                title="Ver mi Perfil"
               >
                 <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-400 transition flex items-center gap-1">
-                  {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
+                  {getEmojiRol(usuario.rol)} {usuario.nombre}
                 </span>
                 
                 {usuario.avatar_url ? (
                   <img 
                     src={usuario.avatar_url} 
                     alt="Miniatura de perfil" 
-                    className="w-7 h-7 rounded-full object-cover border border-slate-600 shadow group-hover:border-blue-400 transition"
+                    className="w-6 h-6 rounded-full object-cover border border-slate-600 shadow group-hover:border-blue-400 transition"
                   />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center text-xs border border-slate-600 group-hover:border-blue-400 transition">
+                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center text-[10px] border border-slate-600 group-hover:border-blue-400 transition">
                     {getEmojiRol(usuario.rol)}
                   </div>
                 )}
@@ -183,7 +176,7 @@ export default function MapaPage() {
 
               <button 
                 onClick={handleCerrarSesion}
-                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs self-center"
+                className="text-slate-400 hover:text-rose-400 transition ml-1 font-bold text-xs"
                 title="Cerrar Sesión"
               >
                 ✕
@@ -197,10 +190,10 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* Contenedor Principal del Mapa y las Herramientas */}
+      {/* Contenedor Principal del Mapa */}
       <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
         
-        {/* 🛠️ RESTAURADO: Buscador de Destino Superior */}
+        {/* Barra de Búsqueda Superior */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <form onSubmit={handleBuscarDestino} className="flex gap-2">
             <div className="relative flex-1">
@@ -219,11 +212,11 @@ export default function MapaPage() {
           </form>
           
           <button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition active:scale-95 text-center">
-            Calcular ruta óptima con Dijkstra →
+            Calcular ruta óptma con Dijkstra →
           </button>
         </div>
 
-        {/* 🛠️ RESTAURADO: Fila de Ubicación GPS, Localizador y Estado del Autómata */}
+        {/* Fila de Estado de Ubicación y Autómata */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs bg-slate-800 border border-slate-700 text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
@@ -241,19 +234,17 @@ export default function MapaPage() {
 
           <div className="bg-slate-950/80 border border-slate-800 p-2 rounded-xl text-right flex items-center justify-between sm:justify-end gap-4">
             <div className="text-left sm:text-right">
-              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Autómata Dijkstra</span>
+              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">AUTOMÁTA DIJKSTRA</span>
               <span className="text-xs text-slate-300 font-mono">Camino: Nodo_A → Nodo_B → Nodo_D</span>
             </div>
-            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase tracking-widest font-extrabold px-2 py-0.5 rounded-md animate-pulse">
-              En vivo
+            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase tracking-widest font-extrabold px-2 py-0.5 rounded-md">
+              EN VIVO
             </span>
           </div>
         </div>
 
-        {/* Área del Visualizador del Mapa */}
+        {/* Contenedor del Mapa Físico */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
-          
-          {/* MAPA DINÁMICO */}
           <iframe
             src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
@@ -262,15 +253,13 @@ export default function MapaPage() {
             referrerPolicy="no-referrer-when-downgrade"
           ></iframe>
 
-          {/* Estado del Sistema flotante */}
           <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700 shadow-lg flex items-center gap-2 z-10">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs font-semibold text-slate-200">GPS Activo · Huancayo</span>
+            <span className="text-xs font-semibold text-slate-200">Sistema GPS Activo · Perú</span>
           </div>
 
-          {/* Panel de reportes rápidos en la zona */}
           <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en la Incontrastable</h3>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en tu zona</h3>
             <div className="max-h-48 overflow-y-auto flex flex-col gap-2">
               {reportes.length === 0 ? (
                 <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
@@ -278,4 +267,53 @@ export default function MapaPage() {
                 reportes.map((r) => (
                   <div 
                     key={r.id} 
-                    onClick={() => irAUbicacion(r
+                    onClick={() => irAUbicacion(r.latitud, r.longitud)}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-slate-700 flex justify-between items-center cursor-pointer transition active:scale-95"
+                  >
+                    <span className="capitalize text-slate-200 font-medium">⚠️ {r.tipo_reporte}</span>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">Ver</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Panel Inferior para Reportar Incidentes */}
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button
+              onClick={() => handleCrearAlerta('Accidente')}
+              disabled={cargandoAlerta}
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚨 Accidente
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Tráfico')}
+              disabled={cargandoAlerta}
+              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚗 Tráfico
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Operativo')}
+              disabled={cargandoAlerta}
+              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              👮 Operativo
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Vía Cerrada')}
+              disabled={cargandoAlerta}
+              className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚧 Vía Cerrada
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
