@@ -51,10 +51,8 @@ export default function MapaPage() {
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   
-  // URL por defecto apuntando al centro de Huancayo con calles y entorno visibles
-  const [urlMapa, setUrlMapa] = useState<string>(
-    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed'
-  );
+  // URL inicial de carga con direcciones por defecto
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?saddr=-12.0674,-75.2102&daddr=-12.0674,-75.2102&t=&z=15&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -80,7 +78,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&t=&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -121,7 +119,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&t=&z=16&output=embed`);
       });
     }
   };
@@ -174,30 +172,57 @@ export default function MapaPage() {
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    // Renderiza la ruta en modo direcciones uniendo tu origen con el destino del nodo
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&t=&z=14&output=embed`);
   };
 
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!destino.trim()) return;
+    const busqueda = destino.trim();
+    if (!busqueda) return;
 
-    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
-      n.toLowerCase().includes(destino.toLowerCase()) ||
-      NODOS_MAPA[n].direccionGoogle.toLowerCase().includes(destino.toLowerCase().replace(/ /g, "+"))
+    const encontradoPorClave = Object.keys(NODOS_MAPA).find(
+      n => n.toLowerCase() === busqueda.toLowerCase()
     );
 
-    if (nodoEncontrado) {
-      ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
+    let nodoPorAlias: string | null = null;
+    if (!encontradoPorClave) {
+      const bLower = busqueda.toLowerCase();
+      if (bLower.includes("continental") || bLower.includes("universidad")) nodoPorAlias = "Nodo_A";
+      else if (bLower.includes("ferrocarril")) nodoPorAlias = "Nodo_B";
+      else if (bLower.includes("real plaza") || bLower.includes("plaza")) nodoPorAlias = "Nodo_D";
+    }
+
+    const nodoFinal = encontradoPorClave || nodoPorAlias;
+
+    if (nodoFinal) {
+      ejecutarDijkstraDesdeUbicacion(nodoFinal);
     } else {
-      const direccionDestinoQuery = encodeURIComponent(destino + ", Huancayo, Peru");
-      // Renderiza el modo direcciones para texto libre preservando el entorno
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=14&output=embed`);
+      const terminoBusqueda = busqueda.toLowerCase();
       
-      setCaminoCalculado(`Mi Ubicación → ${destino}`);
-      setTiempoEstimado("Calculando...");
-      setCostoRuta("Variable");
-      setRutaActiva(['Mi Ubicación', destino]);
+      // Verificamos si es una búsqueda fuera de Huancayo (Nacional / Interprovincial)
+      const esBusquedaExterna = terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya") || terminoBusqueda.includes("peru");
+      
+      if (esBusquedaExterna) {
+        // CORRECCIÓN CLAVE: Si es externo (ej: Lima), dejamos que Google maneje el origen y destino globalmente
+        // sin amarrarlo a coordenadas fijas de Huancayo para que muestre el trayecto largo nacional completo con sus variantes de carretera.
+        const direccionDestinoQuery = encodeURIComponent(busqueda);
+        setUrlMapa(`https://maps.google.com/maps?saddr=Huancayo&daddr=${direccionDestinoQuery}&t=&z=7&output=embed`);
+        
+        setCaminoCalculado(`Huancayo → ${busqueda}`);
+        setTiempoEstimado("Calculando viaje interprovincial...");
+        setCostoRuta("Variable");
+      } else {
+        // Si es una calle local de Huancayo que no está en los nodos, calcula desde el GPS actual
+        const queryFinal = `${busqueda}, Huancayo, Peru`;
+        const direccionDestinoQuery = encodeURIComponent(queryFinal);
+        setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&t=&z=14&output=embed`);
+        
+        setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
+        setTiempoEstimado("Calculando...");
+        setCostoRuta("Variable");
+      }
+      
+      setRutaActiva(['Mi Ubicación', busqueda]);
     }
   };
 
@@ -216,8 +241,13 @@ export default function MapaPage() {
       }
     };
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((p) => guardar(p.coords.latitude, p.coords.longitude), () => guardar(coordenadasActuales.lat, coordenadasActuales.lng));
-    } else { guardar(coordenadasActuales.lat, coordenadasActuales.lng); }
+      navigator.geolocation.getCurrentPosition(
+        (p) => guardar(p.coords.latitude, p.coords.longitude), 
+        () => guardar(coordenadasActuales.lat, coordenadasActuales.lng)
+      );
+    } else { 
+      guardar(coordenadasActuales.lat, coordenadasActuales.lng); 
+    }
   };
 
   return (
@@ -302,7 +332,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier destino o dirección (ej. Atalaya y real, Av. Giráldez, Real Plaza)..." 
+              placeholder="Introduce cualquier destino nacional (ej. Universidad Continental, Lima, Jauja, Oroya)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
@@ -312,7 +342,13 @@ export default function MapaPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span><span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
+            <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
+            <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
+            {rutaActiva.length > 0 && (
+              <span className="text-[10px] text-blue-400 block mt-1 font-sans">🛣️ En ruta: {rutaActiva.join(' → ')}</span>
+            )}
+          </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO EN RUTA</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">COSTO DE LLEGADA</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
