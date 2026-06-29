@@ -34,17 +34,17 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
   
-  // Tu visor de camino del autómata Dijkstra original
+  // Tu visor del camino calculado original intacto
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Camino: Nodo_A → Nodo_B → Nodo_D');
 
-  // TU UBICACIÓN NACIONAL EXACTA DE PERÚ (SIN CAMBIOS)
+  // Tus coordenadas originales de Huancayo (-12.05, -75.23)
   const [centroMapa, setCentroMapa] = useState({
     lat: -12.05, 
     lng: -75.23,
     zoom: 13 
   });
 
-  // Tus nodos originales intactos
+  // Tu base de datos original de nodos
   const [NODOS_MAPA, setNodosMapa] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.05, lng: -75.23, conexiones: { "Nodo_B": 5 } },
     "Nodo_B": { lat: -12.06, lng: -75.21, conexiones: { "Nodo_A": 5, "Nodo_D": 3 } },
@@ -98,7 +98,7 @@ export default function MapaPage() {
     }
   };
 
-  // Tu algoritmo de Dijkstra original (Con tipado para compilar limpio en Vercel)
+  // Tu algoritmo original de Dijkstra (Corregido el tipo implícito 'any' de nodoActual para Vercel)
   const ejecutarDijkstra = (inicio: string, fin: string) => {
     if (!NODOS_MAPA[inicio] || !NODOS_MAPA[fin]) {
       alert("Nodos de origen o destino no válidos.");
@@ -321,7 +321,7 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Iframe del Mapa Físico (Corregido con la URL limpia) */}
+        {/* Iframe del Mapa Físico (Corregido con la URL nativa sin caracteres extra) */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           <iframe
             src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
