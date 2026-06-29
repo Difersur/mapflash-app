@@ -50,11 +50,7 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
-  
-  // URL por defecto apuntando al centro de Huancayo con calles y entorno visibles
-  const [urlMapa, setUrlMapa] = useState<string>(
-    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed'
-  );
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -174,7 +170,6 @@ export default function MapaPage() {
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
-    // Renderiza la ruta en modo direcciones uniendo tu origen con el destino del nodo
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
   };
 
@@ -190,12 +185,17 @@ export default function MapaPage() {
     if (nodoEncontrado) {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
-      const direccionDestinoQuery = encodeURIComponent(destino + ", Huancayo, Peru");
-      // Renderiza el modo direcciones para texto libre preservando el entorno
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=14&output=embed`);
+      const terminoBusqueda = destino.toLowerCase();
+      const esBusquedaExterna = terminoBusqueda.includes("peru") || terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya");
+      
+      const queryFinal = esBusquedaExterna ? destino : `${destino}, Huancayo, Peru`;
+      const direccionDestinoQuery = encodeURIComponent(queryFinal);
+      const zoom = esBusquedaExterna ? 8 : 14;
+      
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
-      setTiempoEstimado("Calculando...");
+      setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "Calculando...");
       setCostoRuta("Variable");
       setRutaActiva(['Mi Ubicación', destino]);
     }
