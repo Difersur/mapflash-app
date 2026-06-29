@@ -50,7 +50,7 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed');
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -178,12 +178,10 @@ export default function MapaPage() {
     const busqueda = destino.trim();
     if (!busqueda) return;
 
-    // 1. Verificar si coincide directamente con las claves de nuestros nodos (Nodo_A, Nodo_B, Nodo_D)
     const encontradoPorClave = Object.keys(NODOS_MAPA).find(
       n => n.toLowerCase() === busqueda.toLowerCase()
     );
 
-    // 2. Verificar por alias comunes dentro del mapa local de Huancayo
     let nodoPorAlias: string | null = null;
     if (!encontradoPorClave) {
       const bLower = busqueda.toLowerCase();
@@ -195,10 +193,8 @@ export default function MapaPage() {
     const nodoFinal = encontradoPorClave || nodoPorAlias;
 
     if (nodoFinal) {
-      // Si es de nuestro grafo, calcula Dijkstra impecablemente con el desglose de nodos
       ejecutarDijkstraDesdeUbicacion(nodoFinal);
     } else {
-      // Si no es un nodo del sistema, se asume dirección libre (Local o Regional)
       const terminoBusqueda = busqueda.toLowerCase();
       const esBusquedaExterna = terminoBusqueda.includes("peru") || terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya");
       
@@ -225,13 +221,18 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } finally {
+      } finaly {
         setCargandoAlerta(false);
       }
     };
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((p) => guardar(p.coords.latitude, p.coords.longitude), () => guardar(coordenadasActuales.lat, coordinates => coordenadasActuales.lng));
-    } else { guardar(coordenadasActuales.lat, coordenadasActuales.lng); }
+      navigator.geolocation.getCurrentPosition(
+        (p) => guardar(p.coords.latitude, p.coords.longitude), 
+        () => guardar(coordenadasActuales.lat, coordenadasActuales.lng)
+      );
+    } else { 
+      guardar(coordenadasActuales.lat, coordenadasActuales.lng); 
+    }
   };
 
   return (
