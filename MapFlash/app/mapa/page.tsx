@@ -259,4 +259,62 @@ export default function MapaPage() {
             <span className="text-xs font-semibold text-slate-200">Sistema GPS Activo · Perú</span>
           </div>
 
-          <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w
+          <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en tu zona</h3>
+            <div className="max-h-48 overflow-y-auto flex flex-col gap-2">
+              {reportes.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
+              ) : (
+                reportes.map((r) => (
+                  <div 
+                    key={r.id} 
+                    onClick={() => irAUbicacion(r.latitud, r.longitud)}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-slate-700 flex justify-between items-center cursor-pointer transition active:scale-95"
+                  >
+                    <span className="capitalize text-slate-200 font-medium">⚠️ {r.tipo_reporte}</span>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">Ver</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Panel Inferior para Reportar Incidentes */}
+        <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <button
+              onClick={() => handleCrearAlerta('Accidente')}
+              disabled={cargandoAlerta}
+              className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚨 Accidente
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Tráfico')}
+              disabled={cargandoAlerta}
+              className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚗 Tráfico
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Operativo')}
+              disabled={cargandoAlerta}
+              className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              👮 Operativo
+            </button>
+            <button
+              onClick={() => handleCrearAlerta('Vía Cerrada')}
+              disabled={cargandoAlerta}
+              className="bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 border border-orange-500/30 font-semibold py-3 px-4 rounded-xl transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
+            >
+              🚧 Vía Cerrada
+            </button>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
