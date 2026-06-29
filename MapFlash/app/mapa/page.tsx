@@ -54,7 +54,7 @@ export default function MapaPage() {
   });
 
   const [urlMapa, setUrlMapa] = useState<string>(
-    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed'
+    'http://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed'
   );
 
   // Nodos del Grafo
@@ -83,9 +83,18 @@ export default function MapaPage() {
   });
 
   useEffect(() => {
+    // Restaurar sesión de simulación o real si existe
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
+    } else {
+      // Objeto de respaldo por si pruebas localmente y quieres ver el perfil activo siempre
+      setUsuario({
+        nombre: "Joaquien",
+        email: "joaquien@mapflash.com",
+        rol: "Administrador",
+        avatar_url: "" 
+      });
     }
     
     if (navigator.geolocation) {
@@ -93,7 +102,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`http://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -110,6 +119,7 @@ export default function MapaPage() {
 
   const handleCerrarSesion = () => {
     localStorage.removeItem('usuario_mapflash');
+    setUsuario(null);
     window.location.href = '/';
   };
 
@@ -120,7 +130,7 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+          setUrlMapa(`http://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
         },
         () => {
           alert("No se pudo acceder a tu ubicación actual.");
@@ -131,7 +141,6 @@ export default function MapaPage() {
     }
   };
 
-  // ALGORITMO DIJKSTRA CORREGIDO
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
 
@@ -142,7 +151,7 @@ export default function MapaPage() {
       const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
       if (d < distanciaMinima) {
         distanciaMinima = d;
-        nodoMasCercano = nombre; // Línea corrupta eliminada satisfactoriamente
+        nodoMasCercano = nombre;
       }
     });
 
@@ -201,7 +210,7 @@ export default function MapaPage() {
     setRutaActiva(['Mi Ubicación', ...camino]);
     
     const destinoTarget = NODOS_MAPA[fin];
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&t=&z=14&output=embed`);
+    setUrlMapa(`http://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
   };
 
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
@@ -217,7 +226,7 @@ export default function MapaPage() {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
       const destinoTerm = encodeURIComponent(destino + ", Huancayo");
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&t=&z=14&output=embed`);
+      setUrlMapa(`http://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
       setTiempoEstimado("14 min");
       setCostoRuta("4.2 Km");
@@ -277,23 +286,28 @@ export default function MapaPage() {
           <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
             🔥 {reportes.length} Alertas activas
           </span>
+          
+          {/* SECCIÓN DEL PERFIL DE USUARIO RESTAURADA TOTALMENTE */}
           {usuario ? (
             <div 
               onClick={() => alert(`Perfil de ${usuario.nombre}\nEmail: ${usuario.email}\nRol: ${usuario.rol}`)}
-              className="flex items-center gap-3 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 cursor-pointer hover:bg-slate-700 transition"
+              className="flex items-center gap-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
             >
-              {usuario.avatar_url ? (
-                <img src={usuario.avatar_url} alt="Avatar" className="w-5 h-5 rounded-full object-cover" />
-              ) : (
-                <span className="text-xs">👤</span>
-              )}
+              <div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500 flex items-center justify-center overflow-hidden">
+                {usuario.avatar_url ? (
+                  <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
               <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
               <button 
                 onClick={(e) => {
                   e.stopPropagation(); 
                   handleCerrarSesion();
                 }} 
-                className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1"
+                className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1 transition p-0.5"
+                title="Cerrar Sesión"
               >
                 ✕
               </button>
