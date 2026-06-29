@@ -22,7 +22,6 @@ interface AlertaTrafico {
   estado: string;
 }
 
-// Interfaz estricta para tus nodos nacionales o globales
 interface NodoGrafo {
   lat: number;
   lng: number;
@@ -34,19 +33,19 @@ export default function MapaPage() {
   const [reportes, setReportes] = useState<AlertaTrafico[]>([]);
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
-
-  // Tu visor del autómata Dijkstra original
+  
+  // Tu visor de camino del autómata Dijkstra original
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Camino: Nodo_A → Nodo_B → Nodo_D');
 
-  // Coordenadas iniciales para la ubicación en Perú
+  // TU UBICACIÓN NACIONAL EXACTA DE PERÚ (SIN CAMBIOS)
   const [centroMapa, setCentroMapa] = useState({
     lat: -12.05, 
     lng: -75.23,
     zoom: 13 
   });
 
-  // Base de datos de tus nodos globales/nacionales
-  const [grafoNodos, setGrafoNodos] = useState<Record<string, NodoGrafo>>({
+  // Tus nodos originales intactos
+  const [NODOS_MAPA, setNodosMapa] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.05, lng: -75.23, conexiones: { "Nodo_B": 5 } },
     "Nodo_B": { lat: -12.06, lng: -75.21, conexiones: { "Nodo_A": 5, "Nodo_D": 3 } },
     "Nodo_D": { lat: -12.07, lng: -75.22, conexiones: { "Nodo_B": 3 } }
@@ -99,10 +98,10 @@ export default function MapaPage() {
     }
   };
 
-  // Tu algoritmo de Dijkstra corregido sin errores de tipos implícitos para Vercel
+  // Tu algoritmo de Dijkstra original (Con tipado para compilar limpio en Vercel)
   const ejecutarDijkstra = (inicio: string, fin: string) => {
-    if (!grafoNodos[inicio] || !grafoNodos[fin]) {
-      alert("Nodos de origen o destino no válidos en el sistema.");
+    if (!NODOS_MAPA[inicio] || !NODOS_MAPA[fin]) {
+      alert("Nodos de origen o destino no válidos.");
       return;
     }
 
@@ -110,17 +109,17 @@ export default function MapaPage() {
     const previos: Record<string, string | null> = {};
     const visitados = new Set<string>();
 
-    Object.keys(grafoNodos).forEach(nodo => {
+    Object.keys(NODOS_MAPA).forEach(nodo => {
       distancias[nodo] = Infinity;
       previos[nodo] = null;
     });
     distancias[inicio] = 0;
 
-    while (visitados.size < Object.keys(grafoNodos).length) {
-      let nodoActual: string | null = null;
+    while (visitados.size < Object.keys(NODOS_MAPA).length) {
+      let nodoActual: string | null = null; 
       let distanciaMinima = Infinity;
 
-      Object.keys(grafoNodos).forEach(nodo => {
+      Object.keys(NODOS_MAPA).forEach(nodo => {
         if (!visitados.has(nodo) && distancias[nodo] < distanciaMinima) {
           distanciaMinima = distancias[nodo];
           nodoActual = nodo;
@@ -130,7 +129,7 @@ export default function MapaPage() {
       if (nodoActual === null || nodoActual === fin) break;
       visitados.add(nodoActual);
 
-      const conexiones = grafoNodos[nodoActual as string].conexiones || {};
+      const conexiones = NODOS_MAPA[nodoActual as string].conexiones || {};
       Object.keys(conexiones).forEach(vecino => {
         const alt = distancias[nodoActual as string] + conexiones[vecino];
         if (alt < distancias[vecino]) {
@@ -150,8 +149,8 @@ export default function MapaPage() {
     setCaminoCalculado(`Camino: ${camino.join(' → ')}`);
     
     setCentroMapa({
-      lat: grafoNodos[fin].lat,
-      lng: grafoNodos[fin].lng,
+      lat: NODOS_MAPA[fin].lat,
+      lng: NODOS_MAPA[fin].lng,
       zoom: 15
     });
   };
@@ -160,12 +159,12 @@ export default function MapaPage() {
     e.preventDefault();
     if (!destino) return;
 
-    const nodoEncontrado = Object.keys(grafoNodos).find(n => 
+    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
       n.toLowerCase().includes(destino.toLowerCase())
     );
 
     if (nodoEncontrado) {
-      const nodo = grafoNodos[nodoEncontrado];
+      const nodo = NODOS_MAPA[nodoEncontrado];
       setCentroMapa({
         lat: nodo.lat,
         lng: nodo.lng,
@@ -173,7 +172,7 @@ export default function MapaPage() {
       });
       ejecutarDijkstra("Nodo_A", nodoEncontrado);
     } else {
-      alert("Destino no registrado en el grafo.");
+      alert("El destino no corresponde a ningún nodo registrado.");
     }
   };
 
@@ -266,10 +265,10 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* Contenedor Principal del Mapa */}
+      {/* Contenedor Principal */}
       <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
         
-        {/* Barra de Búsqueda Superior */}
+        {/* Barra de Búsqueda */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <form onSubmit={handleBuscarDestino} className="flex gap-2">
             <div className="relative flex-1">
@@ -290,7 +289,7 @@ export default function MapaPage() {
           <button 
             type="button"
             onClick={() => {
-              const fin = Object.keys(grafoNodos).find(n => n.toLowerCase().includes(destino.toLowerCase())) || "Nodo_D";
+              const fin = Object.keys(NODOS_MAPA).find(n => n.toLowerCase().includes(destino.toLowerCase())) || "Nodo_D";
               ejecutarDijkstra("Nodo_A", fin);
             }}
             className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-xl text-sm transition active:scale-95 text-center"
@@ -322,7 +321,7 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Contenedor del Mapa Físico (Google Maps Nativo Corregido) */}
+        {/* Iframe del Mapa Físico (Corregido con la URL limpia) */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           <iframe
             src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
@@ -354,7 +353,7 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* Panel Inferior para Reportar Incidentes */}
+        {/* Panel Inferior de Alertas */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
