@@ -77,7 +77,6 @@ export default function MapaPage() {
   const [opcionesEncontradas, setOpcionesEncontradas] = useState<OpcionSugerida[]>([]);
   const [mostrarPanelOpciones, setMostrarPanelOpciones] = useState(false);
 
-  // Mantenemos los nodos locales por si se requiere un cálculo Dijkstra exacto en Huancayo
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0544, lng: -75.1989, direccionGoogle: "Universidad+Continental+San+Carlos,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 2.8, tiempoMin: 8 }] },
     "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }, { idDestino: "Nodo_D", distanciaKm: 1.2, tiempoMin: 4 }] },
@@ -112,7 +111,7 @@ export default function MapaPage() {
       const porDefecto: LugarGuardado[] = [
         { id: '1', nombre: 'Plaza de Armas de Lima', direccionQuery: 'Plaza de Armas de Lima, Peru', icono: '🏛️' },
         { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Peru', icono: '🛍️' },
-        { id: '3', nombre: 'Mall Plaza Arequipa', direccionQuery: 'Mall Plaza, Arequipa, Peru', icono: '🏢' }
+        { id: '3', font: '', nombre: 'Mall Plaza Arequipa', direccionQuery: 'Mall Plaza, Arequipa, Peru', icono: '🏢' }
       ];
       setLugaresGuardados(porDefecto);
       localStorage.setItem('favoritos_mapflash', JSON.stringify(porDefecto));
@@ -153,6 +152,26 @@ export default function MapaPage() {
     setUsuario(null);
     setVerPerfilDetallado(false);
     window.location.href = '/';
+  };
+
+  // Función para activar el input de archivo oculto
+  const abrirSelectorDeArchivo = () => {
+    if (archivoInputRef.current) {
+      archivoInputRef.current.click();
+    }
+  };
+
+  // Función que procesa el cambio de archivo y renderiza la foto en el perfil
+  const handleCambiarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivos = e.target.files;
+    if (archivos && archivos.length > 0 && usuario) {
+      const nuevoArchivo = archivos[0];
+      const nuevaUrlAvatar = URL.createObjectURL(nuevoArchivo);
+      
+      const usuarioActualizado = { ...usuario, avatar_url: nuevaUrlAvatar };
+      setUsuario(usuarioActualizado);
+      localStorage.setItem('usuario_mapflash', JSON.stringify(usuarioActualizado));
+    }
   };
 
   const localizarMiPosicion = () => {
@@ -231,7 +250,6 @@ export default function MapaPage() {
 
     let terminoLimpio = busqueda.toLowerCase();
 
-    // 1. INTERCEPTOR DE AMBIGÜEDAD NACIONAL
     let claveAmbiguaEncontrada = "";
     if (terminoLimpio.includes("upla")) claveAmbiguaEncontrada = "upla";
     else if (terminoLimpio.includes("tupac amaru") || terminoLimpio.includes("tupac")) claveAmbiguaEncontrada = "tupac amaru";
@@ -244,7 +262,6 @@ export default function MapaPage() {
       return;
     }
 
-    // 2. RECUPERADO: Enrutamiento Dijkstra directo si el usuario busca algo específico de Huancayo estando en la zona
     let nodoDestinoKey: string | null = null;
     if (regionActual === 'Huancayo') {
       if (terminoLimpio.includes("san carlos")) {
@@ -259,7 +276,6 @@ export default function MapaPage() {
     if (nodoDestinoKey) {
       ejecutarDijkstraDesdeUbicacion(nodoDestinoKey);
     } else {
-      // 3. BUSCADOR LIBRE GENERAL PARA TODO EL PERÚ
       const sufijoPais = terminoLimpio.includes("peru") || terminoLimpio.includes("perú") ? "" : ", Peru";
       const queryDestino = `${busqueda}${sufijoPais}`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
@@ -347,7 +363,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* MODAL PERFIL */}
+      {/* MODAL PERFIL CON SISTEMA PARA AGREGAR/CAMBIAR FOTO HABILITADO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -356,6 +372,38 @@ export default function MapaPage() {
                 <h2 className="text-md font-bold text-white">👤 Perfil de Conductor</h2>
                 <button onClick={() => setVerPerfilDetallado(false)} className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800 p-2 rounded-xl transition">✕ Cerrar</button>
               </div>
+              
+              {/* Contenedor Interactivo de Foto */}
+              <div className="flex flex-col items-center gap-3 mb-6 bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                <div className="relative group cursor-pointer" onClick={abrirSelectorDeArchivo}>
+                  <img 
+                    src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} 
+                    alt="Foto Perfil Grande" 
+                    className="w-24 h-24 rounded-full border-2 border-blue-500 object-cover shadow-lg shadow-blue-500/10 group-hover:opacity-75 transition"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition">
+                    <span className="text-[10px] text-white font-bold uppercase tracking-wider">Cambiar</span>
+                  </div>
+                </div>
+                
+                <button 
+                  type="button" 
+                  onClick={abrirSelectorDeArchivo} 
+                  className="text-[11px] text-blue-400 font-semibold hover:underline bg-blue-500/5 px-3 py-1 rounded-lg border border-blue-500/10"
+                >
+                  📸 Subir / Cambiar Foto
+                </button>
+                
+                {/* Input nativo de archivos (Oculto) */}
+                <input 
+                  type="file" 
+                  ref={archivoInputRef} 
+                  onChange={handleCambiarFoto} 
+                  className="hidden" 
+                  accept="image/*" 
+                />
+              </div>
+
               <div className="flex flex-col gap-4 text-xs">
                 <div>
                   <label className="block text-slate-400 font-medium mb-1">Nombre:</label>
