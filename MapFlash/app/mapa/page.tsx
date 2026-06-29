@@ -49,11 +49,10 @@ export default function MapaPage() {
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
-  // Coordenadas por defecto estables de Huancayo por si el GPS tarda en responder
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   
-  // URL inicial segura centrada en la posición actual para evitar que se aleje al mapamundi
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&t=&z=15&output=embed');
+  // URL inicial segura apuntando a Huancayo por defecto
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -79,10 +78,10 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        // Carga inicial enfocada correctamente en tu GPS real
-        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&t=&z=15&output=embed`);
+        // Vista de punto fijo ideal para centrar tu GPS en el mapa inicial sin errores
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
       }, (error) => {
-        console.log("Error de GPS, usando Huancayo por defecto", error);
+        console.log("Error de GPS, usando coordenadas estables por defecto", error);
       });
     }
     obtenerReportesEnVivo();
@@ -117,16 +116,19 @@ export default function MapaPage() {
     }
   };
 
+  // SOLUCIÓN AL BOTÓN DE LOCALIZAR: Cambiado al modo visualizador clásico q= que nunca se aleja
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&t=&z=16&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+      }, () => {
+        setUrlMapa(`https://maps.google.com/maps?q=${coordenadasActuales.lat},${coordenadasActuales.lng}&z=16&output=embed`);
       });
     } else {
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&t=&z=16&output=embed`);
+      setUrlMapa(`https://maps.google.com/maps?q=${coordenadasActuales.lat},${coordenadasActuales.lng}&z=16&output=embed`);
     }
   };
 
@@ -206,8 +208,6 @@ export default function MapaPage() {
       const terminoBusqueda = busqueda.toLowerCase();
       const esBusquedaExterna = terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya") || terminoBusqueda.includes("peru");
       
-      // SOLUCIÓN COMPLETA: Usamos siempre tus coordenadas GPS actuales como saddr (origen)
-      // Así el mapa nunca se perderá ni se irá al océano mundial, y calculará la ruta real por carretera hacia Lima o cualquier otra provincia.
       const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
       const direccionDestinoQuery = encodeURIComponent(queryDestino);
       const zoom = esBusquedaExterna ? 8 : 14;
