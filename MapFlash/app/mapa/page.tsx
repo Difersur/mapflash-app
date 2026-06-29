@@ -105,7 +105,6 @@ export default function MapaPage() {
     if (sesionGuardada) setUsuario(JSON.parse(sesionGuardada));
 
     const favoritosLocales = localStorage.getItem('favoritos_mapflash');
-    // CORREGIDO: Se evalúa exactamente la misma variable declarada arriba sin provocar error de compilación
     if (favoritosLocales) {
       setLugaresGuardados(JSON.parse(favoritosLocales));
     } else {
@@ -323,7 +322,8 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } final {
+      } finally {
+        // CORREGIDO: "finally" escrito correctamente para evitar SyntaxError en Vercel
         setCargandoAlerta(false);
       }
     };
