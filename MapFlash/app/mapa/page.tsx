@@ -155,7 +155,7 @@ export default function MapaPage() {
         }
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, () => {
-        setUrlMapa(`https://maps.google.com/maps?q=-12.0464,-77.0428&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=Peru&z=6&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -206,7 +206,7 @@ export default function MapaPage() {
     setCargandoBilletera(true);
     try {
       const { error } = await supabase
-        .from('perfiles')
+        .from('usuarios')
         .update({
           billetera_tipo: billeteraTipo,
           billetera_numero: billeteraNumero,
@@ -515,9 +515,9 @@ export default function MapaPage() {
                 </div>
               </div>
 
-              {/* CARTERA DIGITAL */}
+              {/* BILLETERA DIGITAL */}
               <div className="border-t border-slate-800 pt-4 mt-5">
-                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">📱 Cartera Digital Integrada</h3>
+                <h3 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">📱 Billetera Digital</h3>
                 <form onSubmit={handleGuardarBilletera} className="flex flex-col gap-3">
                   <div>
                     <label className="block text-slate-400 text-[11px] font-medium mb-1">Selecciona tu pasarela preferida:</label>
