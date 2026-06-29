@@ -53,6 +53,7 @@ export default function MapaPage() {
     lng: -75.2102
   });
 
+  // URL inicial corregida apuntando a Huancayo por defecto de manera limpia
   const [urlMapa, setUrlMapa] = useState<string>(
     `https://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed`
   );
@@ -93,7 +94,8 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&z=15&output=embed`);
+        // Muestra tu marcador exacto en el mapa inicial
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -120,7 +122,8 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&z=16&output=embed`);
+          // Corregido: q= ubica el marcador rojo directamente sobre tu GPS con zoom ideal
+          setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
         },
         () => {
           alert("No se pudo acceder a tu ubicación actual.");
@@ -131,7 +134,7 @@ export default function MapaPage() {
     }
   };
 
-  // TU ALGORITMO DE DIJKSTRA ORIGINAL COMPLETO SIN TOCAR NI RECORTE DE LÍNEAS
+  // TU ALGORITMO DE DIJKSTRA ORIGINAL COMPLETO
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
 
@@ -142,6 +145,7 @@ export default function MapaPage() {
       const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
       if (d < distanciaMinima) {
         distanciaMinima = d;
+        nodoMasCercano = name;
         nodoMasCercano = nombre;
       }
     });
@@ -201,7 +205,7 @@ export default function MapaPage() {
     setRutaActiva(['Mi Ubicación', ...camino]);
     
     const destinoTarget = NODOS_MAPA[fin];
-    // Ambos marcadores obligatorios mediante saddr y daddr con template literals correctos
+    // Saddr y daddr unificados con backticks corregidos para la ruta óptima
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
   };
 
@@ -219,7 +223,7 @@ export default function MapaPage() {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
       const destinoTerm = encodeURIComponent(destino + ", Huancayo");
-      // Ambos marcadores obligatorios mediante saddr y daddr en la búsqueda libre
+      // Saddr y daddr unificados con backticks corregidos para la búsqueda libre
       setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
       setTiempoEstimado("14 min");
@@ -292,7 +296,7 @@ export default function MapaPage() {
               <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
               <button 
                 onClick={(e) => {
-                  e.stopPropagation(); // Evita que se dispare el click del perfil contenedor
+                  e.stopPropagation(); 
                   handleCerrarSesion();
                 }} 
                 className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1"
