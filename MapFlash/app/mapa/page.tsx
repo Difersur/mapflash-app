@@ -52,6 +52,7 @@ export default function MapaPage() {
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
+  // Tu estructura de nodos original restablecida
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
     "Nodo_B": { lat: -12.0631, lng: -75.2124, direccionGoogle: "Av.+Ferrocarril,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 }, { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }] },
@@ -165,6 +166,7 @@ export default function MapaPage() {
     let paso: string | null = fin;
     while (paso) { camino.unshift(paso); paso = previos[paso]; }
     
+    // Muestra explícitamente el recorrido completo: Mi Ubicación → Nodo_A → Nodo_B → ...
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
     setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
@@ -177,8 +179,10 @@ export default function MapaPage() {
     e.preventDefault();
     if (!destino.trim()) return;
 
+    // Búsqueda inteligente por alias o coincidencia exacta del nodo
     const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
       n.toLowerCase().includes(destino.toLowerCase()) ||
+      destino.toLowerCase().includes(n.toLowerCase()) ||
       NODOS_MAPA[n].direccionGoogle.toLowerCase().includes(destino.toLowerCase().replace(/ /g, "+"))
     );
 
@@ -302,7 +306,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier destino o dirección (ej. Atalaya y real, Av. Giráldez, Real Plaza)..." 
+              placeholder="Introduce cualquier destino o nodo (ej. Nodo_D, Universidad Continental, Lima)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
