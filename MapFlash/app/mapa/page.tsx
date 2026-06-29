@@ -28,11 +28,11 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
 
-  // Coordenadas originales de tu primera imagen (Lima)
+  // 🗺️ CONFIGURACIÓN NACIONAL: Vista general de todo el Perú al iniciar
   const [centroMapa, setCentroMapa] = useState({
-    lat: -12.05, 
-    lng: -77.04,
-    zoom: 13 
+    lat: -9.1900, 
+    lng: -75.0152,
+    zoom: 5 
   });
 
   useEffect(() => {
@@ -65,6 +65,7 @@ export default function MapaPage() {
     return '👤';
   };
 
+  // Mueve el mapa dinámicamente a donde esté el usuario en tiempo real
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -72,13 +73,15 @@ export default function MapaPage() {
           setCentroMapa({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-            zoom: 16
+            zoom: 15 // Zoom ideal para ver calles de la ciudad actual
           });
         },
         () => {
-          alert("No se pudo acceder a tu ubicación actual.");
+          alert("No se pudo acceder a tu ubicación actual. Por favor, activa los permisos de GPS.");
         }
       );
+    } else {
+      alert("Tu navegador no soporta geolocalización.");
     }
   };
 
@@ -89,8 +92,9 @@ export default function MapaPage() {
     }
     setCargandoAlerta(true);
     
-    let lat = -12.05;
-    let lng = -77.04;
+    // Si el GPS falla, toma la coordenada actual del centro del mapa
+    let lat = centroMapa.lat;
+    let lng = centroMapa.lng;
 
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -155,12 +159,13 @@ export default function MapaPage() {
               <Link 
                 href="/perfil" 
                 className="flex flex-col items-end gap-1 group"
-                title="Ver mi Perfil"
+                title="Ver mi Perfil y Agregar Fotos"
               >
                 <span className="text-xs font-semibold text-slate-200 group-hover:text-blue-400 transition flex items-center gap-1">
-                  {getEmojiRol(usuario.rol)} {usuario.nombre}
+                  {getEmojiRol(usuario.rol)} {usuario.rol === 'Entrega' || usuario.rol === 'entrega' ? 'Entrega' : usuario.nombre}
                 </span>
                 
+                {/* Miniatura de la foto de perfil en barra superior */}
                 {usuario.avatar_url ? (
                   <img 
                     src={usuario.avatar_url} 
@@ -245,8 +250,10 @@ export default function MapaPage() {
 
         {/* Contenedor del Mapa Físico */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
+          
+          {/* 🗺️ VARIABLE CORREGIDA PERFECTAMENTE SIN TEXTO EXTRA */}
           <iframe
-            src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
+            src={`http://googleusercontent.com/maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen={true}
             loading="lazy"
