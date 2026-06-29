@@ -68,7 +68,6 @@ export default function MapaPage() {
   const [nombreNuevoLugar, setNombreNuevoLugar] = useState('');
   const [mostrarFormLugar, setMostrarFormLugar] = useState(false);
   
-  // Coordenadas iniciales por defecto (Centro del Perú / Lima de referencia)
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0464, lng: -77.0428 });
   const [regionActual, setRegionActual] = useState<string>('Perú');
   
@@ -78,13 +77,13 @@ export default function MapaPage() {
   const [opcionesEncontradas, setOpcionesEncontradas] = useState<OpcionSugerida[]>([]);
   const [mostrarPanelOpciones, setMostrarPanelOpciones] = useState(false);
 
-  // Nodos de prueba integrados para rutas Dijkstra rápidas locales
+  // Mantenemos los nodos locales por si se requiere un cálculo Dijkstra exacto en Huancayo
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0544, lng: -75.1989, direccionGoogle: "Universidad+Continental+San+Carlos,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 2.8, tiempoMin: 8 }] },
-    "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }] }
+    "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }, { idDestino: "Nodo_D", distanciaKm: 1.2, tiempoMin: 4 }] },
+    "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 1.2, tiempoMin: 4 }] }
   });
 
-  // Base de datos de desambiguación para términos que suelen causar confusión a nivel nacional
   const BASE_CONOCIMIENTO_AMBIGUEDAD: Record<string, OpcionSugerida[]> = {
     "upla": [
       { nombreEspecifico: "UPLA - Campus Universitario (Chorrillos - Huancayo)", direccionQuery: "UPLA Campus Chorrillos, El Tambo, Huancayo", descripcion: "Sede principal del complejo universitario y facultades generales de Ingeniería/Derecho." },
@@ -92,7 +91,7 @@ export default function MapaPage() {
       { nombreEspecifico: "UPLA - Escuela de Posgrado (Centro)", direccionQuery: "UPLA Posgrado, Jirón Ancash, Huancayo", descripcion: "Oficinas administrativas centrales." }
     ],
     "tupac amaru": [
-      { nombreEspecifico: "Avenida Túpac Amaru (Lima Norte)", direccionQuery: "Av. Tupac Amaru, Lima, Peru", descripcion: "Gran avenida troncal que conecta el distrito de Comas, Carabayllo e Independencia." },
+      { nombreEspecifico: "Avenida Túpac Amaru (Lima Norte)", direccionQuery: "Av. Tupac Amaru, Lima, Peru", descripcion: "Gran avenida troncal que conecta los distritos de Comas, Carabayllo e Independencia." },
       { nombreEspecifico: "Avenida Túpac Amaru (El Tambo - Huancayo)", direccionQuery: "Av. Tupac Amaru, El Tambo, Huancayo", descripcion: "Vía principal en la zona norte de Huancayo." },
       { nombreEspecifico: "Jirón Túpac Amaru (Puno)", direccionQuery: "Jiron Tupac Amaru, Puno, Peru", descripcion: "Calle urbana céntrica en la región de Puno." }
     ],
@@ -113,7 +112,7 @@ export default function MapaPage() {
       const porDefecto: LugarGuardado[] = [
         { id: '1', nombre: 'Plaza de Armas de Lima', direccionQuery: 'Plaza de Armas de Lima, Peru', icono: '🏛️' },
         { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Peru', icono: '🛍️' },
-        { id: '3', nombre: 'Mallporo Arequipa', direccionQuery: 'Mall de la Saga Falabella, Arequipa, Peru', icono: '🏢' }
+        { id: '3', nombre: 'Mall Plaza Arequipa', direccionQuery: 'Mall Plaza, Arequipa, Peru', icono: '🏢' }
       ];
       setLugaresGuardados(porDefecto);
       localStorage.setItem('favoritos_mapflash', JSON.stringify(porDefecto));
@@ -125,7 +124,6 @@ export default function MapaPage() {
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
         
-        // Detectar de manera dinámica e inteligente la ciudad aproximada del usuario
         if (lat < -11.9 && lat > -12.3 && lng < -76.8 && lng > -77.2) {
           setRegionActual('Lima');
         } else if (lat < -12.0 && lat > -12.1 && lng < -75.1 && lng > -75.3) {
@@ -172,6 +170,33 @@ export default function MapaPage() {
     }
   };
 
+  const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
+    if (!NODOS_MAPA[fin]) return;
+
+    setNodoSeleccionado(fin);
+    const origenLat = coordenadasActuales.lat;
+    const origenLng = coordenadasActuales.lng;
+    const destinoNodo = NODOS_MAPA[fin];
+
+    const difLat = destinoNodo.lat - origenLat;
+    const difLng = destinoNodo.lng - origenLng;
+    const distanciaCalculada = Math.sqrt(difLat * difLat + difLng * difLng) * 111;
+    const tiempoCalculadoMin = Math.round(distanciaCalculada * 4.5) || 5;
+
+    let nombreFormateado = "Destino";
+    if (fin === "Nodo_A") nombreFormateado = "Universidad Continental (San Carlos)";
+    if (fin === "Nodo_B") nombreFormateado = "Av. Ferrocarril";
+    if (fin === "Nodo_D") nombreFormateado = "Real Plaza Huancayo";
+
+    setCaminoCalculado(`Mi Ubicación → ${nombreFormateado}`);
+    setTiempoEstimado(`${tiempoCalculadoMin} min`);
+    setCostoRuta(`${distanciaCalculada.toFixed(2)} Km`);
+    setRutaActiva(['Mi Ubicación', nombreFormateado]);
+    setQueryDestinoActual(destinoNodo.direccionGoogle);
+    
+    setUrlMapa(`https://maps.google.com/maps?saddr=${origenLat},${origenLng}&daddr=${destinoNodo.lat},${destinoNodo.lng}&z=15&output=embed`);
+  };
+
   const irALugarGuardado = (lugar: LugarGuardado) => {
     setNodoSeleccionado(lugar.id);
     const queryDestino = encodeURIComponent(lugar.direccionQuery);
@@ -206,7 +231,7 @@ export default function MapaPage() {
 
     let terminoLimpio = busqueda.toLowerCase();
 
-    // INTERCEPTOR DE AMBIGÜEDAD NACIONAL
+    // 1. INTERCEPTOR DE AMBIGÜEDAD NACIONAL
     let claveAmbiguaEncontrada = "";
     if (terminoLimpio.includes("upla")) claveAmbiguaEncontrada = "upla";
     else if (terminoLimpio.includes("tupac amaru") || terminoLimpio.includes("tupac")) claveAmbiguaEncontrada = "tupac amaru";
@@ -219,20 +244,35 @@ export default function MapaPage() {
       return;
     }
 
-    // BUSCADOR LIBRE Y ABIERTO: Si el usuario incluye el nombre de su ciudad o departamento, lo respeta tal cual.
-    // Si no lo incluye, añade ", Peru" para asegurar que la búsqueda no se salga del país.
-    const sufijoPais = terminoLimpio.includes("peru") || terminoLimpio.includes("perú") ? "" : ", Peru";
-    const queryDestino = `${busqueda}${sufijoPais}`;
-    const direccionDestinoQuery = encodeURIComponent(queryDestino);
-    
-    setQueryDestinoActual(direccionDestinoQuery);
-    setMostrarPanelOpciones(false);
-    
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
-    setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-    setTiempoEstimado("Calculando...");
-    setCostoRuta("Buscando en red vial...");
-    setRutaActiva(['Mi Ubicación', busqueda]);
+    // 2. RECUPERADO: Enrutamiento Dijkstra directo si el usuario busca algo específico de Huancayo estando en la zona
+    let nodoDestinoKey: string | null = null;
+    if (regionActual === 'Huancayo') {
+      if (terminoLimpio.includes("san carlos")) {
+        nodoDestinoKey = "Nodo_A";
+      } else if (terminoLimpio.includes("ferrocarril")) {
+        nodoDestinoKey = "Nodo_B";
+      } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
+        nodoDestinoKey = "Nodo_D";
+      }
+    }
+
+    if (nodoDestinoKey) {
+      ejecutarDijkstraDesdeUbicacion(nodoDestinoKey);
+    } else {
+      // 3. BUSCADOR LIBRE GENERAL PARA TODO EL PERÚ
+      const sufijoPais = terminoLimpio.includes("peru") || terminoLimpio.includes("perú") ? "" : ", Peru";
+      const queryDestino = `${busqueda}${sufijoPais}`;
+      const direccionDestinoQuery = encodeURIComponent(queryDestino);
+      
+      setQueryDestinoActual(direccionDestinoQuery);
+      setMostrarPanelOpciones(false);
+      
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
+      setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
+      setTiempoEstimado("Calculando...");
+      setCostoRuta("Buscando en red vial...");
+      setRutaActiva(['Mi Ubicación', busqueda]);
+    }
   };
 
   const handleAgregarLugarFrecuente = (e: React.FormEvent) => {
