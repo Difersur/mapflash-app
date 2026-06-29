@@ -43,7 +43,6 @@ interface LugarGuardado {
   icono: string;
 }
 
-// NUEVA INTERFAZ: Para manejar las opciones de lugares ambiguos
 interface OpcionSugerida {
   nombreEspecifico: string;
   direccionQuery: string;
@@ -59,54 +58,45 @@ export default function MapaPage() {
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   
-  // Variables de Control e Historial del Grafo originales
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce un destino o selecciona un lugar guardado.');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [nodoSeleccionado, setNodoSeleccionado] = useState<string | null>(null);
   
-  // Estado para lugares guardados del usuario actual
   const [lugaresGuardados, setLugaresGuardados] = useState<LugarGuardado[]>([]);
   const [nombreNuevoLugar, setNombreNuevoLugar] = useState('');
   const [mostrarFormLugar, setMostrarFormLugar] = useState(false);
   
-  // Coordenadas GPS en vivo del dispositivo
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
-  
-  // Estado para saber de qué región es el usuario actual para búsquedas inteligentes
   const [regionActual, setRegionActual] = useState<string>('Huancayo');
   
-  // URL base interactiva
   const [urlMapa, setUrlMapa] = useState<string>('');
   const [queryDestinoActual, setQueryDestinoActual] = useState<string>('');
 
-  // NUEVOS ESTADOS: Para controlar el selector de opciones múltiples
   const [opcionesEncontradas, setOpcionesEncontradas] = useState<OpcionSugerida[]>([]);
   const [mostrarPanelOpciones, setMostrarPanelOpciones] = useState(false);
 
-  // CORRECCIÓN DE COORDENADAS REALES DE HUANCAYO (San Carlos, Real Plaza, Ferrocarril)
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0544, lng: -75.1989, direccionGoogle: "Universidad+Continental+San+Carlos,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 2.8, tiempoMin: 8 }] },
     "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }, { idDestino: "Nodo_D", distanciaKm: 1.2, tiempoMin: 4 }] },
     "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 1.2, tiempoMin: 4 }] }
   });
 
-  // Base de datos local de desambiguación para Huancayo (UPLA, Calles repetidas, etc.)
   const BASE_CONOCIMIENTO_AMBIGUEDAD: Record<string, OpcionSugerida[]> = {
     "upla": [
-      { nombreEspecifico: "UPLA - Campus Universitario (Chorrillos)", direccionQuery: "UPLA Campus Chorrillos, Huancayo", descripcion: "Sede principal y facultades generales (Ingeniería, Derecho, etc.) en el distrito de El Tambo." },
-      { nombreEspecifico: "UPLA - Facultad de Medicina Humana", direccionQuery: "UPLA Facultad de Medicina, Av. San Carlos, Huancayo", descripcion: "Pabellón especializado de salud ubicado cerca de San Carlos." },
-      { nombreEspecifico: "UPLA - Sede Administrativa / Escuela de Posgrado", direccionQuery: "UPLA Posgrado, Ancash, Huancayo", descripcion: "Oficinas de atención y posgrado en el centro de la ciudad." }
+      { nombreEspecifico: "UPLA - Campus Universitario (Chorrillos)", direccionQuery: "UPLA Campus Chorrillos, Huancayo", descripcion: "Sede principal del complejo universitario y facultades generales en El Tambo." },
+      { nombreEspecifico: "UPLA - Facultad de Medicina Humana", direccionQuery: "UPLA Facultad de Medicina, Av. San Carlos, Huancayo", descripcion: "Pabellón e instalaciones de salud situado en el sector de San Carlos." },
+      { nombreEspecifico: "UPLA - Escuela de Posgrado y Oficinas", direccionQuery: "UPLA Posgrado, Jirón Ancash, Huancayo", descripcion: "Sede administrativa central para trámites académicos." }
     ],
     "tupac amaru": [
-      { nombreEspecifico: "Pasaje Túpac Amaru (Barrio Acocancha / San Carlos)", direccionQuery: "Pasaje Tupac Amaru 158, San Carlos, Huancayo", descripcion: "Calle residencial paralela a la Av. San Carlos, cerca de la U. Continental." },
-      { nombreEspecifico: "Av. Túpac Amaru (El Tambo)", direccionQuery: "Av. Tupac Amaru, El Tambo, Huancayo", descripcion: "Avenida principal del distrito de El Tambo, ruta hacia hualhuas/cajas." },
-      { nombreEspecifico: "Calle Túpac Amaru (Chilca)", direccionQuery: "Calle Tupac Amaru, Chilca, Huancayo", descripcion: "Vía urbana en la zona sur (Chilca)." }
+      { nombreEspecifico: "Pasaje Túpac Amaru (San Carlos)", direccionQuery: "Pasaje Tupac Amaru, San Carlos, Huancayo", descripcion: "Pequeña vía residencial cercana al campus de la Universidad Continental." },
+      { nombreEspecifico: "Avenida Túpac Amaru (El Tambo)", direccionQuery: "Av. Tupac Amaru, El Tambo, Huancayo", descripcion: "Arteria principal del distrito norte de El Tambo." },
+      { nombreEspecifico: "Calle Túpac Amaru (Chilca)", direccionQuery: "Calle Tupac Amaru, Chilca, Huancayo", descripcion: "Vía urbana localizada en el sector sur del distrito de Chilca." }
     ],
     "continental": [
-      { nombreEspecifico: "Universidad Continental - Campus San Carlos", direccionQuery: "Universidad Continental, Av. San Carlos 1980, Huancayo", descripcion: "Campus principal de estudios de pregrado." },
-      { nombreEspecifico: "Instituto Continental", direccionQuery: "Instituto Continental, Calle Real 125, Huancayo", descripcion: "Sede de carreras técnicas en plena Calle Real." }
+      { nombreEspecifico: "Universidad Continental - Campus Principal", direccionQuery: "Universidad Continental, Av. San Carlos 1980, Huancayo", descripcion: "Sede principal y pabellones de pregrado." },
+      { nombreEspecifico: "Instituto Continental", direccionQuery: "Instituto Continental, Calle Real 125, Huancayo", descripcion: "Campus de carreras técnicas ubicado en el centro de la ciudad." }
     ]
   };
 
@@ -115,7 +105,8 @@ export default function MapaPage() {
     if (sesionGuardada) setUsuario(JSON.parse(sesionGuardada));
 
     const favoritosLocales = localStorage.getItem('favoritos_mapflash');
-    if (favoritesLocales) {
+    // CORREGIDO: Se evalúa exactamente la misma variable declarada arriba sin provocar error de compilación
+    if (favoritosLocales) {
       setLugaresGuardados(JSON.parse(favoritosLocales));
     } else {
       const porDefecto: LugarGuardado[] = [
@@ -231,16 +222,14 @@ export default function MapaPage() {
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestino}&z=15&output=embed`);
   };
 
-  // FUNCIÓN CLAVE: Procesa la opción exacta que el usuario seleccionó del listado alternativo
   const seleccionarDestinoEspecifico = (opcion: OpcionSugerida) => {
     setMostrarPanelOpciones(false);
     const queryFinal = encodeURIComponent(opcion.direccionQuery);
     setQueryDestinoActual(queryFinal);
 
-    // Simular cálculos rápidos de coordenadas aproximados
     setCaminoCalculado(`Mi Ubicación → ${opcion.nombreEspecifico}`);
     setTiempoEstimado("Calculando...");
-    setCostoRuta("Filtrado por Facultad/Calle exacta");
+    setCostoRuta("Filtrado por Sede/Calle exacta");
     setRutaActiva(['Mi Ubicación', opcion.nombreEspecifico]);
     
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryFinal}&z=15&output=embed`);
@@ -253,7 +242,6 @@ export default function MapaPage() {
 
     let terminoLimpio = busqueda.toLowerCase();
 
-    // NUEVO FILTRO: Detectar si la palabra clave coincide con lugares ambiguos conocidos
     let claveAmbiguaEncontrada = "";
     if (terminoLimpio.includes("upla")) claveAmbiguaEncontrada = "upla";
     else if (terminoLimpio.includes("tupac amaru") || terminoLimpio.includes("tupac")) claveAmbiguaEncontrada = "tupac amaru";
@@ -266,7 +254,6 @@ export default function MapaPage() {
       return;
     }
 
-    // Código por defecto si no es ambiguo
     let nodoDestinoKey: string | null = null;
     if (regionActual === 'Huancayo') {
       if (terminoLimpio.includes("san carlos")) {
@@ -336,7 +323,7 @@ export default function MapaPage() {
         obtenerReportesEnVivo();
       } catch (err) {
         alert("Error al registrar reporte.");
-      } finally {
+      } final {
         setCargandoAlerta(false);
       }
     };
@@ -426,9 +413,9 @@ export default function MapaPage() {
           )}
         </div>
 
-        {/* PANEL INTERACTIVO DE DESAMBIGUACIÓN (SE DISPARA SI HAY CALLES/FACULTADES DUPLICADAS) */}
+        {/* PANEL INTERACTIVO DE DESAMBIGUACIÓN */}
         {mostrarPanelOpciones && opcionesEncontradas.length > 0 && (
-          <div className="bg-slate-900 border-2 border-amber-500/40 p-4 rounded-2xl shadow-2xl animate-fade-in flex flex-col gap-3">
+          <div className="bg-slate-900 border-2 border-amber-500/40 p-4 rounded-2xl shadow-2xl flex flex-col gap-3">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm">⚠️</span>
@@ -441,6 +428,7 @@ export default function MapaPage() {
               {opcionesEncontradas.map((opcion, index) => (
                 <button
                   key={index}
+                  type="button"
                   onClick={() => seleccionarDestinoEspecifico(opcion)}
                   className="bg-slate-950 hover:bg-blue-600/10 border border-slate-800 hover:border-blue-500/50 p-3 rounded-xl text-left transition flex flex-col justify-between group cursor-pointer"
                 >
