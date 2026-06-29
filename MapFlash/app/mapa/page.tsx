@@ -165,7 +165,6 @@ export default function MapaPage() {
     window.location.href = '/';
   };
 
-  // CORREGIDO: Nombre de función sin espacios
   const abrirSelectorDeArchivo = () => {
     if (archivoInputRef.current) {
       archivoInputRef.current.click();
@@ -489,8 +488,9 @@ export default function MapaPage() {
             </div>
           )}
 
+          {/* CORREGIDO: handleAgregarLugarFrecuente para evitar el crash de compilación */}
           {mostrarFormLugar && (
-            <form onSubmit={handleAgregarLuerte} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
+            <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1 w-full">
                 <input type="text" placeholder="Ponle un alias... (Ej: Casa)" value={nombreNuevoLugar} onChange={(e) => setNombreNuevoLugar(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none" />
               </div>
