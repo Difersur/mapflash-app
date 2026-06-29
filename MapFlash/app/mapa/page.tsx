@@ -132,7 +132,7 @@ export default function MapaPage() {
         }
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, () => {
-        setUrlMapa(`https://maps.google.com/maps?q=-12.0631,-75.2124&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=-12.0464,-77.0428&z=6&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -361,7 +361,7 @@ export default function MapaPage() {
         </div>
       </header>
 
-      {/* MODAL PERFIL INTERACTIVO COMPLETO */}
+      {/* MODAL PERFIL INTERACTIVO ORIGINAL COMPLETO */}
       {verPerfilDetallado && usuario && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end">
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
@@ -506,7 +506,7 @@ export default function MapaPage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <a 
-                href={`https://www.google.com/maps/dir/?api=1&origin=${coordenadasActuales.lat},${coordenadasActuales.lng}&destination=${queryDestinoActual || encodeURIComponent(rutaActiva[1])}&travelmode=driving`}
+                href={`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestinoActual || encodeURIComponent(rutaActiva[1])}&travelmode=driving`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center justify-between bg-slate-950 hover:bg-blue-600/10 border border-slate-800 hover:border-blue-500/40 p-3 rounded-xl transition text-left cursor-pointer group"
