@@ -47,17 +47,17 @@ export default function MapaPage() {
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   
-  // Coordenadas GPS por defecto (Huancayo)
+  // Coordenadas GPS en Huancayo
   const [coordenadasActuales, setCoordenadasActuales] = useState({
     lat: -12.0674,
     lng: -75.2102
   });
 
+  // URL Inicial de carga en Huancayo Perú
   const [urlMapa, setUrlMapa] = useState<string>(
-    'http://maps.google.com/maps?q=-12.0674,-75.2102&z=15&output=embed'
+    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed'
   );
 
-  // Nodos del Grafo
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { 
       lat: -12.0565, 
@@ -83,12 +83,10 @@ export default function MapaPage() {
   });
 
   useEffect(() => {
-    // Restaurar sesión de simulación o real si existe
     const sesionGuardada = localStorage.getItem('usuario_mapflash');
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
     } else {
-      // Objeto de respaldo por si pruebas localmente y quieres ver el perfil activo siempre
       setUsuario({
         nombre: "Joaquien",
         email: "joaquien@mapflash.com",
@@ -102,7 +100,7 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
-        setUrlMapa(`http://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       });
     }
     obtenerReportesEnVivo();
@@ -130,7 +128,7 @@ export default function MapaPage() {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`http://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+          setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
         },
         () => {
           alert("No se pudo acceder a tu ubicación actual.");
@@ -210,7 +208,7 @@ export default function MapaPage() {
     setRutaActiva(['Mi Ubicación', ...camino]);
     
     const destinoTarget = NODOS_MAPA[fin];
-    setUrlMapa(`http://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
   };
 
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
@@ -226,7 +224,7 @@ export default function MapaPage() {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
       const destinoTerm = encodeURIComponent(destino + ", Huancayo");
-      setUrlMapa(`http://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
       setTiempoEstimado("14 min");
       setCostoRuta("4.2 Km");
@@ -277,7 +275,7 @@ export default function MapaPage() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between">
-      <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md">
+      <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-50">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">← MapFlash</Link>
           <h1 className="text-lg font-bold text-white">Mapa Nacional del Perú</h1>
@@ -287,26 +285,25 @@ export default function MapaPage() {
             🔥 {reportes.length} Alertas activas
           </span>
           
-          {/* SECCIÓN DEL PERFIL DE USUARIO RESTAURADA TOTALMENTE */}
           {usuario ? (
             <div 
               onClick={() => alert(`Perfil de ${usuario.nombre}\nEmail: ${usuario.email}\nRol: ${usuario.rol}`)}
-              className="flex items-center gap-2.5 bg-slate-800/90 hover:bg-slate-700/90 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
+              className="relative z-[60] flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
             >
-              <div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500 flex items-center justify-center overflow-hidden">
+              <div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500 flex items-center justify-center overflow-hidden pointer-events-none">
                 {usuario.avatar_url ? (
                   <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-xs font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
                 )}
               </div>
-              <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
+              <span className="text-xs font-semibold text-slate-200 pointer-events-none">{usuario.nombre}</span>
               <button 
                 onClick={(e) => {
                   e.stopPropagation(); 
                   handleCerrarSesion();
                 }} 
-                className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1 transition p-0.5"
+                className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1 transition p-1 relative z-[70]"
                 title="Cerrar Sesión"
               >
                 ✕
@@ -318,8 +315,8 @@ export default function MapaPage() {
         </div>
       </header>
 
-      <main className="flex-1 relative bg-slate-950 p-4 flex flex-col gap-4">
-        {/* BUSCADOR ÚNICO */}
+      <main className="flex-1 bg-slate-950 p-4 flex flex-col gap-4 relative z-10">
+        {/* BUSCADOR */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
@@ -361,18 +358,18 @@ export default function MapaPage() {
           </button>
         </div>
 
-        {/* Mapa */}
-        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[400px]">
+        {/* Contenedor del Mapa */}
+        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[480px] z-20">
           <iframe
             src={urlMapa}
-            className="w-full h-full border-0 absolute inset-0"
+            className="w-full h-full border-0 absolute inset-0 z-20"
             allowFullScreen={true}
             loading="lazy"
           ></iframe>
 
           {/* Alternativas de ruta flotantes */}
           {rutaActiva.length > 0 && (
-            <div className="absolute bottom-4 right-4 bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-2xl max-w-xs z-10">
+            <div className="absolute bottom-4 right-4 bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-2xl max-w-xs z-30">
               <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Alternativas de Ruta Generadas</h3>
               <div className="flex flex-col gap-2 text-[11px]">
                 <div className="bg-slate-950 p-2 rounded border border-emerald-500/30">
