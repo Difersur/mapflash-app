@@ -49,10 +49,11 @@ export default function MapaPage() {
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
+  // Coordenadas por defecto estables de Huancayo por si el GPS tarda en responder
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   
-  // URL inicial de carga con direcciones por defecto
-  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?saddr=-12.0674,-75.2102&daddr=-12.0674,-75.2102&t=&z=15&output=embed');
+  // URL inicial segura centrada en la posición actual para evitar que se aleje al mapamundi
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&t=&z=15&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
@@ -78,7 +79,10 @@ export default function MapaPage() {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
+        // Carga inicial enfocada correctamente en tu GPS real
         setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&t=&z=15&output=embed`);
+      }, (error) => {
+        console.log("Error de GPS, usando Huancayo por defecto", error);
       });
     }
     obtenerReportesEnVivo();
@@ -121,6 +125,8 @@ export default function MapaPage() {
         setCoordenadasActuales({ lat, lng });
         setUrlMapa(`https://maps.google.com/maps?saddr=${lat},${lng}&daddr=${lat},${lng}&t=&z=16&output=embed`);
       });
+    } else {
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&t=&z=16&output=embed`);
     }
   };
 
@@ -198,30 +204,19 @@ export default function MapaPage() {
       ejecutarDijkstraDesdeUbicacion(nodoFinal);
     } else {
       const terminoBusqueda = busqueda.toLowerCase();
-      
-      // Verificamos si es una búsqueda fuera de Huancayo (Nacional / Interprovincial)
       const esBusquedaExterna = terminoBusqueda.includes("lima") || terminoBusqueda.includes("jauja") || terminoBusqueda.includes("oroya") || terminoBusqueda.includes("peru");
       
-      if (esBusquedaExterna) {
-        // CORRECCIÓN CLAVE: Si es externo (ej: Lima), dejamos que Google maneje el origen y destino globalmente
-        // sin amarrarlo a coordenadas fijas de Huancayo para que muestre el trayecto largo nacional completo con sus variantes de carretera.
-        const direccionDestinoQuery = encodeURIComponent(busqueda);
-        setUrlMapa(`https://maps.google.com/maps?saddr=Huancayo&daddr=${direccionDestinoQuery}&t=&z=7&output=embed`);
-        
-        setCaminoCalculado(`Huancayo → ${busqueda}`);
-        setTiempoEstimado("Calculando viaje interprovincial...");
-        setCostoRuta("Variable");
-      } else {
-        // Si es una calle local de Huancayo que no está en los nodos, calcula desde el GPS actual
-        const queryFinal = `${busqueda}, Huancayo, Peru`;
-        const direccionDestinoQuery = encodeURIComponent(queryFinal);
-        setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&t=&z=14&output=embed`);
-        
-        setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-        setTiempoEstimado("Calculando...");
-        setCostoRuta("Variable");
-      }
+      // SOLUCIÓN COMPLETA: Usamos siempre tus coordenadas GPS actuales como saddr (origen)
+      // Así el mapa nunca se perderá ni se irá al océano mundial, y calculará la ruta real por carretera hacia Lima o cualquier otra provincia.
+      const queryDestino = esBusquedaExterna ? busqueda : `${busqueda}, Huancayo, Peru`;
+      const direccionDestinoQuery = encodeURIComponent(queryDestino);
+      const zoom = esBusquedaExterna ? 8 : 14;
       
+      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&t=&z=${zoom}&output=embed`);
+      
+      setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
+      setTiempoEstimado(esBusquedaExterna ? "Calculando viaje nacional..." : "Calculando...");
+      setCostoRuta("Variable");
       setRutaActiva(['Mi Ubicación', busqueda]);
     }
   };
@@ -332,7 +327,7 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Introduce cualquier destino nacional (ej. Universidad Continental, Lima, Jauja, Oroya)..." 
+              placeholder="Introduce cualquier destino (ej. Universidad Continental, Lima, Jauja, Oroya)..." 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
