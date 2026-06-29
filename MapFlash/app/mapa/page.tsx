@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 
@@ -41,19 +41,21 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
   
+  // Control del menú desplegable del perfil
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Esperando origen y destino...');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   
-  // Coordenadas GPS en Huancayo
   const [coordenadasActuales, setCoordenadasActuales] = useState({
     lat: -12.0674,
     lng: -75.2102
   });
 
-  // URL Inicial de carga en Huancayo Perú
   const [urlMapa, setUrlMapa] = useState<string>(
     'https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed'
   );
@@ -87,13 +89,22 @@ export default function MapaPage() {
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
     } else {
+      // Dejar los datos reflejados en tu captura para pruebas consistentes
       setUsuario({
         nombre: "Joaquien",
-        email: "joaquien@mapflash.com",
-        rol: "Administrador",
+        email: "Acc2Prueba@gmail.com",
+        rol: "conductor",
         avatar_url: "" 
       });
     }
+    
+    // Cerrar menú al hacer clic afuera
+    function manejarClicAfuera(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuAbierto(false);
+      }
+    }
+    document.addEventListener("mousedown", manejarClicAfuera);
     
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
@@ -104,6 +115,8 @@ export default function MapaPage() {
       });
     }
     obtenerReportesEnVivo();
+
+    return () => document.removeEventListener("mousedown", manejarClicAfuera);
   }, []);
 
   const obtenerReportesEnVivo = async () => {
@@ -286,28 +299,49 @@ export default function MapaPage() {
           </span>
           
           {usuario ? (
-            <div 
-              onClick={() => alert(`Perfil de ${usuario.nombre}\nEmail: ${usuario.email}\nRol: ${usuario.rol}`)}
-              className="relative z-[60] flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
-            >
-              <div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500 flex items-center justify-center overflow-hidden pointer-events-none">
-                {usuario.avatar_url ? (
-                  <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
-                )}
-              </div>
-              <span className="text-xs font-semibold text-slate-200 pointer-events-none">{usuario.nombre}</span>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation(); 
-                  handleCerrarSesion();
-                }} 
-                className="text-slate-400 hover:text-rose-400 font-bold text-xs ml-1 transition p-1 relative z-[70]"
-                title="Cerrar Sesión"
+            <div className="relative" ref={menuRef}>
+              {/* Botón del Perfil de Cabecera */}
+              <div 
+                onClick={() => setMenuAbierto(!menuAbierto)}
+                className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
               >
-                ✕
-              </button>
+                <div className="w-6 h-6 rounded-full bg-blue-600/30 border border-blue-500 flex items-center justify-center overflow-hidden">
+                  {usuario.avatar_url ? (
+                    <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
+                <span className="text-[10px] text-slate-400 transition-transform duration-200 block" style={{ transform: menuAbierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
+              </div>
+
+              {/* MENU DESPLEGABLE INTEGRADITO (TARJETA VISUAL DE PERFIL) */}
+              {menuAbierto && (
+                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 animate-in fade-in slide-in-from-top-2 duration-150 z-[100]">
+                  <div className="flex items-center gap-3 border-b border-slate-700/60 pb-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500 flex items-center justify-center text-sm font-bold text-blue-400">
+                      {usuario.avatar_url ? <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : usuario.nombre.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="overflow-hidden">
+                      <h4 className="text-sm font-bold text-white truncate">{usuario.nombre}</h4>
+                      <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20 font-medium capitalize">{usuario.rol}</span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-xs flex flex-col gap-1">
+                    <span className="text-slate-400 font-medium">Correo Electrónico:</span>
+                    <span className="text-slate-200 font-mono bg-slate-900/50 px-2 py-1 rounded border border-slate-700/40 truncate">{usuario.email}</span>
+                  </div>
+
+                  <button 
+                    onClick={handleCerrarSesion}
+                    className="w-full mt-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold py-2 rounded-xl transition flex items-center justify-center gap-1.5"
+                  >
+                    Cerrar Sesión Activa
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">Iniciar Sesión</Link>
@@ -358,7 +392,7 @@ export default function MapaPage() {
           </button>
         </div>
 
-        {/* Contenedor del Mapa */}
+        {/* Mapa de Google Restablecido */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[480px] z-20">
           <iframe
             src={urlMapa}
