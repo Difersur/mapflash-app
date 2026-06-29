@@ -28,11 +28,11 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
 
-  // Configuración de ubicación inicial nacional (Perú)
+  // Ubicación por defecto que tenías para tu mapa
   const [centroMapa, setCentroMapa] = useState({
-    lat: -12.05, 
-    lng: -77.04,
-    zoom: 13 
+    lat: -12.06, 
+    lng: -75.21,
+    zoom: 14 
   });
 
   useEffect(() => {
@@ -142,7 +142,7 @@ export default function MapaPage() {
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">
             ← MapFlash
           </Link>
-          <h1 className="text-lg font-bold text-white tracking-tight">Mapa Nacional del Perú</h1>
+          <h1 className="text-lg font-bold text-white tracking-tight">Mapa de Huancayo</h1>
         </div>
 
         <div className="flex items-center gap-3">
@@ -246,7 +246,7 @@ export default function MapaPage() {
         {/* Contenedor del Mapa Físico */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           <iframe
-            src={`http://googleusercontent.com/maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
+            src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen={true}
             loading="lazy"
@@ -255,11 +255,11 @@ export default function MapaPage() {
 
           <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700 shadow-lg flex items-center gap-2 z-10">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            <span className="text-xs font-semibold text-slate-200">Sistema GPS Activo · Perú</span>
+            <span className="text-xs font-semibold text-slate-200">GPS Activo · Huancayo</span>
           </div>
 
           <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en tu zona</h3>
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">REPORTES EN LA INCONTRASTABLE</h3>
             <div className="max-h-48 overflow-y-auto flex flex-col gap-2">
               {reportes.length === 0 ? (
                 <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
