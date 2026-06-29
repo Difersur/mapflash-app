@@ -48,7 +48,7 @@ export default function MapaPage() {
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
-  const [, setRutaActiva] = useState<string[]>([]);
+  const [rutaActiva, setRutaActiva] = useState<string[]>([]);
   const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
   const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
@@ -166,7 +166,7 @@ export default function MapaPage() {
     while (paso) { camino.unshift(paso); paso = previos[paso]; }
     
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
-    setTiempoEstimated(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
+    setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
     
@@ -205,14 +205,10 @@ export default function MapaPage() {
       setUrlMapa(`http://googleusercontent.com/maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=${zoom}&output=embed`);
       
       setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-      setTiempoEstimated(esBusquedaExterna ? "Calculando viaje interprovincial..." : "Calculando...");
+      setTiempoEstimado(esBusquedaExterna ? "Calculando viaje interprovincial..." : "Calculando...");
       setCostoRuta("Variable");
       setRutaActiva(['Mi Ubicación', busqueda]);
     }
-  };
-
-  const setTiempoEstimated = (val: string) => {
-    setTiempoEstimado(val);
   };
 
   const handleCrearAlerta = async (tipo: string) => {
@@ -331,7 +327,13 @@ export default function MapaPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span><span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
+            <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
+            <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
+            {rutaActiva.length > 0 && (
+              <span className="text-[10px] text-blue-400 block mt-1 font-sans">🛣️ En ruta: {rutaActiva.join(' → ')}</span>
+            )}
+          </div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO EN RUTA</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
           <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">COSTO DE LLEGADA</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
