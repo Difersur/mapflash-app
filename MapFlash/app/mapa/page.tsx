@@ -58,7 +58,7 @@ export default function MapaPage() {
   const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
   const archivoInputRef = useRef<HTMLInputElement>(null);
   
-  const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce un destino o selecciona un lugar guardado.');
+  const [caminoCalculado, setCaminoCalculado] = useState<string>('Introduce cualquier destino del Perú o selecciona un lugar guardado.');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
@@ -68,8 +68,9 @@ export default function MapaPage() {
   const [nombreNuevoLugar, setNombreNuevoLugar] = useState('');
   const [mostrarFormLugar, setMostrarFormLugar] = useState(false);
   
-  const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0631, lng: -75.2124 });
-  const [regionActual, setRegionActual] = useState<string>('Huancayo');
+  // Coordenadas iniciales por defecto (Centro del Perú / Lima de referencia)
+  const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0464, lng: -77.0428 });
+  const [regionActual, setRegionActual] = useState<string>('Perú');
   
   const [urlMapa, setUrlMapa] = useState<string>('');
   const [queryDestinoActual, setQueryDestinoActual] = useState<string>('');
@@ -77,26 +78,27 @@ export default function MapaPage() {
   const [opcionesEncontradas, setOpcionesEncontradas] = useState<OpcionSugerida[]>([]);
   const [mostrarPanelOpciones, setMostrarPanelOpciones] = useState(false);
 
+  // Nodos de prueba integrados para rutas Dijkstra rápidas locales
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
     "Nodo_A": { lat: -12.0544, lng: -75.1989, direccionGoogle: "Universidad+Continental+San+Carlos,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 2.8, tiempoMin: 8 }] },
-    "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }, { idDestino: "Nodo_D", distanciaKm: 1.2, tiempoMin: 4 }] },
-    "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 1.2, tiempoMin: 4 }] }
+    "Nodo_B": { lat: -12.0672, lng: -75.2111, direccionGoogle: "Av.+Ferrocarril+con+Giraldez,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 2.8, tiempoMin: 8 }] }
   });
 
+  // Base de datos de desambiguación para términos que suelen causar confusión a nivel nacional
   const BASE_CONOCIMIENTO_AMBIGUEDAD: Record<string, OpcionSugerida[]> = {
     "upla": [
-      { nombreEspecifico: "UPLA - Campus Universitario (Chorrillos)", direccionQuery: "UPLA Campus Chorrillos, Huancayo", descripcion: "Sede principal del complejo universitario y facultades generales en El Tambo." },
-      { nombreEspecifico: "UPLA - Facultad de Medicina Humana", direccionQuery: "UPLA Facultad de Medicina, Av. San Carlos, Huancayo", descripcion: "Pabellón e instalaciones de salud situado en el sector de San Carlos." },
-      { nombreEspecifico: "UPLA - Escuela de Posgrado y Oficinas", direccionQuery: "UPLA Posgrado, Jirón Ancash, Huancayo", descripcion: "Sede administrativa central para trámites académicos." }
+      { nombreEspecifico: "UPLA - Campus Universitario (Chorrillos - Huancayo)", direccionQuery: "UPLA Campus Chorrillos, El Tambo, Huancayo", descripcion: "Sede principal del complejo universitario y facultades generales de Ingeniería/Derecho." },
+      { nombreEspecifico: "UPLA - Facultad de Medicina Humana (San Carlos)", direccionQuery: "UPLA Facultad de Medicina, Av. San Carlos, Huancayo", descripcion: "Pabellón especializado de ciencias de la salud." },
+      { nombreEspecifico: "UPLA - Escuela de Posgrado (Centro)", direccionQuery: "UPLA Posgrado, Jirón Ancash, Huancayo", descripcion: "Oficinas administrativas centrales." }
     ],
     "tupac amaru": [
-      { nombreEspecifico: "Pasaje Túpac Amaru (San Carlos)", direccionQuery: "Pasaje Tupac Amaru, San Carlos, Huancayo", descripcion: "Pequeña vía residencial cercana al campus de la Universidad Continental." },
-      { nombreEspecifico: "Avenida Túpac Amaru (El Tambo)", direccionQuery: "Av. Tupac Amaru, El Tambo, Huancayo", descripcion: "Arteria principal del distrito norte de El Tambo." },
-      { nombreEspecifico: "Calle Túpac Amaru (Chilca)", direccionQuery: "Calle Tupac Amaru, Chilca, Huancayo", descripcion: "Vía urbana localizada en el sector sur del distrito de Chilca." }
+      { nombreEspecifico: "Avenida Túpac Amaru (Lima Norte)", direccionQuery: "Av. Tupac Amaru, Lima, Peru", descripcion: "Gran avenida troncal que conecta el distrito de Comas, Carabayllo e Independencia." },
+      { nombreEspecifico: "Avenida Túpac Amaru (El Tambo - Huancayo)", direccionQuery: "Av. Tupac Amaru, El Tambo, Huancayo", descripcion: "Vía principal en la zona norte de Huancayo." },
+      { nombreEspecifico: "Jirón Túpac Amaru (Puno)", direccionQuery: "Jiron Tupac Amaru, Puno, Peru", descripcion: "Calle urbana céntrica en la región de Puno." }
     ],
-    "continental": [
-      { nombreEspecifico: "Universidad Continental - Campus Principal", direccionQuery: "Universidad Continental, Av. San Carlos 1980, Huancayo", descripcion: "Sede principal y pabellones de pregrado." },
-      { nombreEspecifico: "Instituto Continental", direccionQuery: "Instituto Continental, Calle Real 125, Huancayo", descripcion: "Campus de carreras técnicas ubicado en el centro de la ciudad." }
+    "javier prado": [
+      { nombreEspecifico: "Av. Javier Prado Este (San Borja / La Molina)", direccionQuery: "Av. Javier Prado Este, Lima", descripcion: "Zona financiera y empresarial de Lima." },
+      { nombreEspecifico: "Av. Javier Prado Oeste (Magdalena / San Isidro)", direccionQuery: "Av. Javier Prado Oeste, Lima", descripcion: "Tramo residencial y comercial hacia el mar." }
     ]
   };
 
@@ -109,9 +111,9 @@ export default function MapaPage() {
       setLugaresGuardados(JSON.parse(favoritosLocales));
     } else {
       const porDefecto: LugarGuardado[] = [
-        { id: '1', nombre: 'U. Continental (San Carlos)', direccionQuery: 'Universidad Continental, Av. San Carlos, Huancayo', icono: '🏫' },
-        { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Av. Ferrocarril, Huancayo', icono: '🛍️' },
-        { id: '3', nombre: 'Av. Ferrocarril', direccionQuery: 'Av. Ferrocarril, Huancayo', icono: '🛤️' }
+        { id: '1', nombre: 'Plaza de Armas de Lima', direccionQuery: 'Plaza de Armas de Lima, Peru', icono: '🏛️' },
+        { id: '2', nombre: 'Real Plaza Huancayo', direccionQuery: 'Real Plaza Huancayo, Peru', icono: '🛍️' },
+        { id: '3', nombre: 'Mallporo Arequipa', direccionQuery: 'Mall de la Saga Falabella, Arequipa, Peru', icono: '🏢' }
       ];
       setLugaresGuardados(porDefecto);
       localStorage.setItem('favoritos_mapflash', JSON.stringify(porDefecto));
@@ -123,10 +125,13 @@ export default function MapaPage() {
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
         
+        // Detectar de manera dinámica e inteligente la ciudad aproximada del usuario
         if (lat < -11.9 && lat > -12.3 && lng < -76.8 && lng > -77.2) {
           setRegionActual('Lima');
-        } else {
+        } else if (lat < -12.0 && lat > -12.1 && lng < -75.1 && lng > -75.3) {
           setRegionActual('Huancayo');
+        } else {
+          setRegionActual('Perú');
         }
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`);
       }, () => {
@@ -152,19 +157,6 @@ export default function MapaPage() {
     window.location.href = '/';
   };
 
-  const handleCambiarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file && usuario) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const nuevoUsuario = { ...usuario, avatar_url: reader.result as string };
-        setUsuario(nuevoUsuario);
-        localStorage.setItem('usuario_mapflash', JSON.stringify(nuevoUsuario));
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position: GeolocationPosition) => {
@@ -172,39 +164,12 @@ export default function MapaPage() {
         const lng = position.coords.longitude;
         setCoordenadasActuales({ lat, lng });
         setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
-        setCaminoCalculado("Mapa centrado en tu posición GPS real.");
+        setCaminoCalculado("Mapa sincronizado con tu ubicación GPS en tiempo real.");
         setNodoSeleccionado(null);
         setQueryDestinoActual('');
         setMostrarPanelOpciones(false);
       });
     }
-  };
-
-  const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
-    if (!NODOS_MAPA[fin]) return;
-
-    setNodoSeleccionado(fin);
-    const origenLat = coordenadasActuales.lat;
-    const origenLng = coordenadasActuales.lng;
-    const destinoNodo = NODOS_MAPA[fin];
-
-    const difLat = destinoNodo.lat - origenLat;
-    const difLng = destinoNodo.lng - origenLng;
-    const distanciaCalculada = Math.sqrt(difLat * difLat + difLng * difLng) * 111;
-    const tiempoCalculadoMin = Math.round(distanciaCalculada * 4.5) || 5;
-
-    let nombreFormateado = "Destino";
-    if (fin === "Nodo_A") nombreFormateado = "Universidad Continental (San Carlos)";
-    if (fin === "Nodo_B") nombreFormateado = "Av. Ferrocarril";
-    if (fin === "Nodo_D") nombreFormateado = "Real Plaza Huancayo";
-
-    setCaminoCalculado(`Mi Ubicación → ${nombreFormateado}`);
-    setTiempoEstimado(`${tiempoCalculadoMin} min`);
-    setCostoRuta(`${distanciaCalculada.toFixed(2)} Km`);
-    setRutaActiva(['Mi Ubicación', nombreFormateado]);
-    setQueryDestinoActual(destinoNodo.direccionGoogle);
-    
-    setUrlMapa(`https://maps.google.com/maps?saddr=${origenLat},${origenLng}&daddr=${destinoNodo.lat},${destinoNodo.lng}&z=15&output=embed`);
   };
 
   const irALugarGuardado = (lugar: LugarGuardado) => {
@@ -215,7 +180,7 @@ export default function MapaPage() {
     
     setCaminoCalculado(`Mi Ubicación → ${lugar.nombre}`);
     setTiempoEstimado("Calculando...");
-    setCostoRuta("Trazando ruta...");
+    setCostoRuta("Trazando ruta nacional...");
     setRutaActiva(['Mi Ubicación', lugar.nombre]);
     
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryDestino}&z=15&output=embed`);
@@ -228,7 +193,7 @@ export default function MapaPage() {
 
     setCaminoCalculado(`Mi Ubicación → ${opcion.nombreEspecifico}`);
     setTiempoEstimado("Calculando...");
-    setCostoRuta("Filtrado por Sede/Calle exacta");
+    setCostoRuta("Filtrado específico nacional");
     setRutaActiva(['Mi Ubicación', opcion.nombreEspecifico]);
     
     setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${queryFinal}&z=15&output=embed`);
@@ -241,58 +206,43 @@ export default function MapaPage() {
 
     let terminoLimpio = busqueda.toLowerCase();
 
+    // INTERCEPTOR DE AMBIGÜEDAD NACIONAL
     let claveAmbiguaEncontrada = "";
     if (terminoLimpio.includes("upla")) claveAmbiguaEncontrada = "upla";
     else if (terminoLimpio.includes("tupac amaru") || terminoLimpio.includes("tupac")) claveAmbiguaEncontrada = "tupac amaru";
-    else if (terminoLimpio.includes("continental")) claveAmbiguaEncontrada = "continental";
+    else if (terminoLimpio.includes("javier prado")) claveAmbiguaEncontrada = "javier prado";
 
     if (claveAmbiguaEncontrada && BASE_CONOCIMIENTO_AMBIGUEDAD[claveAmbiguaEncontrada]) {
       setOpcionesEncontradas(BASE_CONOCIMIENTO_AMBIGUEDAD[claveAmbiguaEncontrada]);
       setMostrarPanelOpciones(true);
-      setCaminoCalculado(`Múltiples opciones encontradas para "${busqueda}". Selecciona una.`);
+      setCaminoCalculado(`Múltiples ubicaciones nacionales encontradas para "${busqueda}".`);
       return;
     }
 
-    let nodoDestinoKey: string | null = null;
-    if (regionActual === 'Huancayo') {
-      if (terminoLimpio.includes("san carlos")) {
-        nodoDestinoKey = "Nodo_A";
-      } else if (terminoLimpio.includes("ferrocarril")) {
-        nodoDestinoKey = "Nodo_B";
-      } else if (terminoLimpio.includes("real plaza") || terminoLimpio.includes("plaza")) {
-        nodoDestinoKey = "Nodo_D";
-      }
-    }
-
-    if (nodoDestinoKey) {
-      ejecutarDijkstraDesdeUbicacion(nodoDestinoKey);
-    } else {
-      const tieneEspecificacionGeografica = terminoLimpio.includes("huancayo") || terminoLimpio.includes("lima");
-      const queryDestino = tieneEspecificacionGeografica ? busqueda : `${busqueda}, ${regionActual}, Peru`;
-      const direccionDestinoQuery = encodeURIComponent(queryDestino);
-      setQueryDestinoActual(direccionDestinoQuery);
-      setMostrarPanelOpciones(false);
-      
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
-      setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
-      setTiempoEstimado("Calculando...");
-      setCostoRuta("Buscando dirección...");
-      setRutaActiva(['Mi Ubicación', busqueda]);
-    }
+    // BUSCADOR LIBRE Y ABIERTO: Si el usuario incluye el nombre de su ciudad o departamento, lo respeta tal cual.
+    // Si no lo incluye, añade ", Peru" para asegurar que la búsqueda no se salga del país.
+    const sufijoPais = terminoLimpio.includes("peru") || terminoLimpio.includes("perú") ? "" : ", Peru";
+    const queryDestino = `${busqueda}${sufijoPais}`;
+    const direccionDestinoQuery = encodeURIComponent(queryDestino);
+    
+    setQueryDestinoActual(direccionDestinoQuery);
+    setMostrarPanelOpciones(false);
+    
+    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${direccionDestinoQuery}&z=15&output=embed`);
+    setCaminoCalculado(`Mi Ubicación → ${busqueda}`);
+    setTiempoEstimado("Calculando...");
+    setCostoRuta("Buscando en red vial...");
+    setRutaActiva(['Mi Ubicación', busqueda]);
   };
 
   const handleAgregarLugarFrecuente = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nombreNuevoLugar.trim() || !destino.trim()) return alert("Por favor ingresa un nombre.");
-
-    const queryFinal = destino.trim().toLowerCase().includes(regionActual.toLowerCase()) 
-      ? destino.trim() 
-      : `${destino.trim()}, ${regionActual}, Peru`;
+    if (!nombreNuevoLugar.trim() || !destino.trim()) return alert("Por favor ingresa un nombre para el favorito.");
 
     const nuevoLugar: LugarGuardado = {
       id: Date.now().toString(),
       nombre: nombreNuevoLugar.trim(),
-      direccionQuery: queryFinal,
+      direccionQuery: destino.trim().toLowerCase().includes("peru") ? destino.trim() : `${destino.trim()}, Peru`,
       icono: '📍'
     };
 
@@ -302,7 +252,7 @@ export default function MapaPage() {
     
     setNombreNuevoLugar('');
     setMostrarFormLugar(false);
-    alert(`¡"${nuevoLugar.nombre}" guardado con éxito!`);
+    alert(`¡"${nuevoLugar.nombre}" guardado en tus favoritos nacionales!`);
   };
 
   const eliminarLugarFrecuente = (id: string, e: React.MouseEvent) => {
@@ -313,17 +263,16 @@ export default function MapaPage() {
   };
 
   const handleCreateAlerta = async (tipo: string) => {
-    if (!usuario) return alert("Inicia sesión primero.");
+    if (!usuario) return alert("Inicia sesión primero para reportar un incidente.");
     setCargandoAlerta(true);
     const guardar = async (l: number, g: number) => {
       try {
         await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
-        alert(`¡Alerta de ${tipo} registrada!`);
+        alert(`¡Alerta de ${tipo} registrada exitosamente en tu ubicación actual!`);
         obtenerReportesEnVivo();
       } catch (err) {
-        alert("Error al registrar reporte.");
+        alert("Error al conectar con la base de datos de alertas.");
       } finally {
-        // CORREGIDO: "finally" escrito correctamente para evitar SyntaxError en Vercel
         setCargandoAlerta(false);
       }
     };
@@ -343,11 +292,11 @@ export default function MapaPage() {
       <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-40">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">← MapFlash</Link>
-          <h1 className="text-lg font-bold text-white">Mapa Nacional del Perú</h1>
+          <h1 className="text-lg font-bold text-white">Mapa Nacional del Perú 🇵🇪</h1>
         </div>
         <div className="flex items-center gap-3">
           <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
-            🔥 {reportes.length} Alertas activas
+            🔥 {reportes.length} Reportes en tiempo real
           </span>
           {usuario && (
             <button onClick={() => setVerPerfilDetallado(true)} className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition text-left">
@@ -364,21 +313,21 @@ export default function MapaPage() {
           <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between">
             <div>
               <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
-                <h2 className="text-md font-bold text-white">👤 Detalles del Perfil</h2>
+                <h2 className="text-md font-bold text-white">👤 Perfil de Conductor</h2>
                 <button onClick={() => setVerPerfilDetallado(false)} className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800 p-2 rounded-xl transition">✕ Cerrar</button>
               </div>
               <div className="flex flex-col gap-4 text-xs">
                 <div>
-                  <label className="block text-slate-400 font-medium mb-1">Nombre de Usuario:</label>
+                  <label className="block text-slate-400 font-medium mb-1">Nombre:</label>
                   <input type="text" readOnly value={usuario.nombre} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none" />
                 </div>
                 <div>
-                  <label className="block text-slate-400 font-medium mb-1">Correo Electrónico:</label>
+                  <label className="block text-slate-400 font-medium mb-1">Email de cuenta:</label>
                   <input type="text" readOnly value={usuario.email} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none" />
                 </div>
               </div>
             </div>
-            <button onClick={handleCerrarSesion} className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition">Cerrar Sesión Completa</button>
+            <button onClick={handleCerrarSesion} className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition">Cerrar Sesión</button>
           </div>
         </div>
       )}
@@ -389,39 +338,39 @@ export default function MapaPage() {
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
             <input 
               type="text" 
-              placeholder="Ej: Universidad UPLA, Pasaje Tupac Amaru, San Carlos..." 
+              placeholder="Busca cualquier calle, avenida o plaza del Perú... (Ej: Av. Javier Prado, Lima / Jirón Puno, Cusco)" 
               value={destino} 
               onChange={(e) => setDestino(e.target.value)} 
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" 
             />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition">Buscar Ubicación 🔍</button>
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition">Buscar Destino 🔍</button>
           </form>
 
           {destino && (
             <div className="mt-3 flex justify-end">
-              <button type="button" onClick={() => setMostrarFormLugar(!mostrarFormLugar)} className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition">⭐ Guardar dirección</button>
+              <button type="button" onClick={() => setMostrarFormLugar(!mostrarFormLugar)} className="text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-lg hover:bg-amber-500 hover:text-slate-950 transition">⭐ Marcar como Favorito</button>
             </div>
           )}
 
           {mostrarFormLugar && (
             <form onSubmit={handleAgregarLugarFrecuente} className="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row gap-2 items-end">
               <div className="flex-1 w-full">
-                <input type="text" placeholder="Alias para recordar este lugar..." value={nombreNuevoLugar} onChange={(e) => setNombreNuevoLugar(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none" />
+                <input type="text" placeholder="Ponle un alias... (Ej: Casa Trujillo, Trabajo Lima)" value={nombreNuevoLugar} onChange={(e) => setNombreNuevoLugar(e.target.value)} className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white focus:outline-none" />
               </div>
-              <button type="submit" className="bg-emerald-600 text-xs font-bold px-4 py-2 rounded-lg text-white transition">Confirmar</button>
+              <button type="submit" className="bg-emerald-600 text-xs font-bold px-4 py-2 rounded-lg text-white transition">Guardar</button>
             </form>
           )}
         </div>
 
-        {/* PANEL INTERACTIVO DE DESAMBIGUACIÓN */}
+        {/* PANEL DE DESAMBIGUACIÓN MULTI-REGIÓN */}
         {mostrarPanelOpciones && opcionesEncontradas.length > 0 && (
           <div className="bg-slate-900 border-2 border-amber-500/40 p-4 rounded-2xl shadow-2xl flex flex-col gap-3">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm">⚠️</span>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Se encontraron múltiples sedes o calles con el mismo nombre:</span>
+                <span>⚠️</span>
+                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Múltiples lugares encontrados en distintas regiones del Perú:</span>
               </div>
-              <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-mono">Acción requerida</span>
+              <span className="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20 font-mono">Selector global</span>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -436,7 +385,7 @@ export default function MapaPage() {
                     <span className="block text-xs font-bold text-slate-200 group-hover:text-blue-400 transition mb-1">📍 {opcion.nombreEspecifico}</span>
                     <span className="block text-[11px] text-slate-400 leading-relaxed">{opcion.descripcion}</span>
                   </div>
-                  <span className="block text-[10px] text-slate-600 mt-3 italic font-mono">Query: {opcion.direccionQuery}</span>
+                  <span className="block text-[10px] text-slate-600 mt-3 italic font-mono">Destino: {opcion.direccionQuery}</span>
                 </button>
               ))}
             </div>
@@ -445,7 +394,7 @@ export default function MapaPage() {
 
         {/* FAVORITOS */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">⭐ Tus Lugares Guardados (Frecuentes):</span>
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">⭐ Tus Marcadores del Perú:</span>
           <div className="flex flex-wrap gap-2 items-center mt-1">
             {lugaresGuardados.map((lugar) => (
               <div key={lugar.id} onClick={() => irALugarGuardado(lugar)} className={`flex items-center gap-2 text-xs px-3.5 py-2 rounded-xl border transition font-medium cursor-pointer relative group ${nodoSeleccionado === lugar.id ? 'bg-blue-600 text-white border-blue-500' : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'}`}>
@@ -457,18 +406,18 @@ export default function MapaPage() {
           </div>
         </div>
 
-        {/* MÉTRICAS */}
+        {/* METRICAS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span><span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span></div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO ESTIMADO</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">DISTANCIA TOTAL</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">Ruta Activa</span><span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">Tiempo de viaje</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">Distancia Estimada</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
 
-        {/* ENLACES RÁPIDOS DE RUTA */}
+        {/* ENLACES RÁPIDOS */}
         {rutaActiva.length > 0 && !mostrarPanelOpciones && (
           <div className="bg-slate-900 border border-blue-500/20 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
             <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">🗺️ Asistencia de Navegación Directa:</span>
+              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">🗺️ Opciones de Navegación Externa:</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <a 
@@ -478,14 +427,14 @@ export default function MapaPage() {
                 className="flex items-center justify-between bg-slate-950 hover:bg-blue-600/10 border border-slate-800 hover:border-blue-500/40 p-3 rounded-xl transition text-left cursor-pointer group"
               >
                 <div>
-                  <span className="block text-xs font-bold text-slate-200 group-hover:text-blue-400">Abrir en App de Navegación</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">Indicaciones guiadas por voz paso a paso</span>
+                  <span className="block text-xs font-bold text-slate-200 group-hover:text-blue-400">Lanzar indicaciones GPS</span>
+                  <span className="block text-[10px] text-slate-500 mt-0.5">Abrir en tu app nativa de mapas con guiado por voz</span>
                 </div>
                 <span className="text-sm">🚀</span>
               </a>
               <div className="bg-slate-950 border border-slate-800 p-3 rounded-xl flex flex-col justify-center">
-                <span className="block text-xs font-bold text-slate-300">Sugerencia Local</span>
-                <span className="block text-[10px] text-emerald-400 mt-0.5">🟢 Evitar congestión de transporte en horas punta de {regionActual}.</span>
+                <span className="block text-xs font-bold text-slate-300">Monitoreo de Red</span>
+                <span className="block text-[10px] text-emerald-400 mt-0.5">🟢 Buscando rutas alternas óptimas en territorio de {regionActual}.</span>
               </div>
             </div>
           </div>
@@ -494,23 +443,23 @@ export default function MapaPage() {
         {/* CONTROLES */}
         <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
           <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Región Geográfica: {regionActual}, Perú
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Localizado en: {regionActual}
           </span>
-          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition">📍 Sincronizar GPS</button>
+          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition">📍 Centrar en mi GPS</button>
         </div>
 
-        {/* MAPA */}
+        {/* MAPA VISOR */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[440px] z-20">
           {urlMapa ? (
             <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Sincronizando visor satelital...</div>
+            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">Cargando visor nacional...</div>
           )}
         </div>
 
-        {/* ALERTAS */}
+        {/* BOTONES DE INCIDENTES */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">REPORTAR TRÁFICO O INCIDENTE LOCAL</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button onClick={() => handleCreateAlerta('Accidente')} disabled={cargandoAlerta} className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold py-3 px-4 rounded-xl transition">🚨 Accidente</button>
             <button onClick={() => handleCreateAlerta('Tráfico')} disabled={cargandoAlerta} className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold py-3 px-4 rounded-xl transition">🚗 Tráfico</button>
