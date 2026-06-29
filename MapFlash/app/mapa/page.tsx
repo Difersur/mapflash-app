@@ -41,47 +41,22 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
   
-  // Control del menú desplegable del perfil
-  const [menuAbierto, setMenuAbierto] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  // Estado para controlar la ventana flotante del perfil completo
+  const [verPerfilDetallado, setVerPerfilDetallado] = useState(false);
+  const archivoInputRef = useRef<HTMLInputElement>(null);
   
   const [caminoCalculado, setCaminoCalculado] = useState<string>('Esperando origen y destino...');
   const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
   const [costoRuta, setCostoRuta] = useState<string>('-- Km');
   
   const [rutaActiva, setRutaActiva] = useState<string[]>([]);
-  
-  const [coordenadasActuales, setCoordenadasActuales] = useState({
-    lat: -12.0674,
-    lng: -75.2102
-  });
-
-  const [urlMapa, setUrlMapa] = useState<string>(
-    'https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed'
-  );
+  const [coordenadasActuales, setCoordenadasActuales] = useState({ lat: -12.0674, lng: -75.2102 });
+  const [urlMapa, setUrlMapa] = useState<string>('https://maps.google.com/maps?q=-12.0674,-75.2102&z=14&output=embed');
 
   const [NODOS_MAPA] = useState<Record<string, NodoGrafo>>({
-    "Nodo_A": { 
-      lat: -12.0565, 
-      lng: -75.2282, 
-      direccionGoogle: "Universidad+Continental,Huancayo",
-      conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] 
-    },
-    "Nodo_B": { 
-      lat: -12.0631, 
-      lng: -75.2124, 
-      direccionGoogle: "Av.+Ferrocarril,Huancayo",
-      conexiones: [
-        { idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 },
-        { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }
-      ] 
-    },
-    "Nodo_D": { 
-      lat: -12.0728, 
-      lng: -75.2201, 
-      direccionGoogle: "Real+Plaza+Huancayo",
-      conexiones: [{ idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }] 
-    }
+    "Nodo_A": { lat: -12.0565, lng: -75.2282, direccionGoogle: "Universidad+Continental,Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }] },
+    "Nodo_B": { lat: -12.0631, lng: -75.2124, direccionGoogle: "Av.+Ferrocarril,Huancayo", conexiones: [{ idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 }, { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }] },
+    "Nodo_D": { lat: -12.0728, lng: -75.2201, direccionGoogle: "Real+Plaza+Huancayo", conexiones: [{ idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }] }
   });
 
   useEffect(() => {
@@ -89,7 +64,6 @@ export default function MapaPage() {
     if (sesionGuardada) {
       setUsuario(JSON.parse(sesionGuardada));
     } else {
-      // COLOCAMOS UNA FOTO POR DEFECTO PARA QUE SE VISUALICE CORRECTAMENTE SIEMPRE
       setUsuario({
         nombre: "Joaquien",
         email: "Acc2Prueba@gmail.com",
@@ -97,13 +71,6 @@ export default function MapaPage() {
         avatar_url: "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien" 
       });
     }
-    
-    function manejarClicAfuera(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuAbierto(false);
-      }
-    }
-    document.addEventListener("mousedown", manejarClicAfuera);
     
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
@@ -114,55 +81,53 @@ export default function MapaPage() {
       });
     }
     obtenerReportesEnVivo();
-
-    return () => document.removeEventListener("mousedown", manejarClicAfuera);
   }, []);
 
   const obtenerReportesEnVivo = async () => {
-    const { data } = await supabase
-      .from('alertas_trafico')
-      .select('*')
-      .eq('estado', 'activo');
-
+    const { data } = await supabase.from('alertas_trafico').select('*').eq('estado', 'activo');
     if (data) setReportes(data);
   };
 
   const handleCerrarSesion = () => {
     localStorage.removeItem('usuario_mapflash');
     setUsuario(null);
+    setVerPerfilDetallado(false);
     window.location.href = '/';
+  };
+
+  // Manejo de la subida o captura de foto de perfil
+  const handleCambiarFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && usuario) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const nuevoUsuario = { ...usuario, avatar_url: reader.result as string };
+        setUsuario(nuevoUsuario);
+        localStorage.setItem('usuario_mapflash', JSON.stringify(nuevoUsuario));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const localizarMiPosicion = () => {
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setCoordenadasActuales({ lat, lng });
-          setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
-        },
-        () => {
-          alert("No se pudo acceder a tu ubicación actual.");
-        }
-      );
-    } else {
-      alert("Tu navegador no soporta geolocalización.");
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setCoordenadasActuales({ lat, lng });
+        setUrlMapa(`https://maps.google.com/maps?q=${lat},${lng}&z=16&output=embed`);
+      });
     }
   };
 
   const ejecutarDijkstraDesdeUbicacion = (fin: string) => {
     if (!NODOS_MAPA[fin]) return;
-
     let nodoMasCercano = "Nodo_A";
     let distanciaMinima = Infinity;
 
     Object.entries(NODOS_MAPA).forEach(([nombre, datos]) => {
       const d = Math.sqrt(Math.pow(datos.lat - coordenadasActuales.lat, 2) + Math.pow(datos.lng - coordenadasActuales.lng, 2));
-      if (d < distanciaMinima) {
-        distanciaMinima = d;
-        nodoMasCercano = nombre;
-      }
+      if (d < distanciaMinima) { distanciaMinima = d; nodoMasCercano = nombre; }
     });
 
     const distancias: Record<string, number> = {};
@@ -170,26 +135,14 @@ export default function MapaPage() {
     const previos: Record<string, string | null> = {};
     const visitados = new Set<string>();
 
-    Object.keys(NODOS_MAPA).forEach(nodo => {
-      distancias[nodo] = Infinity;
-      tiempos[nodo] = Infinity;
-      previos[nodo] = null;
-    });
-    
-    distancias[nodoMasCercano] = 0;
-    tiempos[nodoMasCercano] = 0;
+    Object.keys(NODOS_MAPA).forEach(nodo => { distancias[nodo] = Infinity; tiempos[nodo] = Infinity; previos[nodo] = null; });
+    distancias[nodoMasCercano] = 0; tiempos[nodoMasCercano] = 0;
 
     while (visitados.size < Object.keys(NODOS_MAPA).length) {
-      let nodoActual: string | null = null; 
-      let distMin = Infinity;
-
+      let nodoActual: string | null = null; let distMin = Infinity;
       Object.keys(NODOS_MAPA).forEach(nodo => {
-        if (!visitados.has(nodo) && distancias[nodo] < distMin) {
-          distMin = distancias[nodo];
-          nodoActual = nodo;
-        }
+        if (!visitados.has(nodo) && distancias[nodo] < distMin) { distMin = distancias[nodo]; nodoActual = nodo; }
       });
-
       if (nodoActual === null || nodoActual === fin) break;
       visitados.add(nodoActual);
 
@@ -198,233 +151,181 @@ export default function MapaPage() {
         const vecino = conexion.idDestino;
         const altDistancia = distancias[nodoActual as string] + conexion.distanciaKm;
         const altTiempo = tiempos[nodoActual as string] + conexion.tiempoMin;
-
-        if (altDistancia < distancias[vecino]) {
-          distancias[vecino] = altDistancia;
-          tiempos[vecino] = altTiempo;
-          previos[vecino] = nodoActual;
-        }
+        if (altDistancia < distancias[vecino]) { distancias[vecino] = altDistancia; tiempos[vecino] = altTiempo; previos[vecino] = nodoActual; }
       });
     }
 
-    const camino: string[] = [];
-    let paso: string | null = fin;
-    while (paso) {
-      camino.unshift(paso);
-      paso = previos[paso];
-    }
-
+    const camino: string[] = []; let paso: string | null = fin;
+    while (paso) { camino.unshift(paso); paso = previos[paso]; }
     setCaminoCalculado(`Mi Ubicación → ${camino.join(' → ')}`);
     setTiempoEstimado(`${distancias[fin] !== Infinity ? tiempos[fin] : 12} min`);
     setCostoRuta(`${distancias[fin] !== Infinity ? distancias[fin] : 3.5} Km`);
     setRutaActiva(['Mi Ubicación', ...camino]);
-    
-    const destinoTarget = NODOS_MAPA[fin];
-    setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTarget.lat},${destinoTarget.lng}&z=14&output=embed`);
+    setUrlMapa(`https://maps.google.com/maps?q=${NODOS_MAPA[fin].lat},${NODOS_MAPA[fin].lng}&z=14&output=embed`);
   };
 
   const handleBuscarDestinoUnificado = (e: React.FormEvent) => {
     e.preventDefault();
     if (!destino) return;
-
-    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => 
-      n.toLowerCase().includes(destino.toLowerCase()) || 
-      NODOS_MAPA[n].direccionGoogle.toLowerCase().includes(destino.toLowerCase())
-    );
-
+    const nodoEncontrado = Object.keys(NODOS_MAPA).find(n => n.toLowerCase().includes(destino.toLowerCase()));
     if (nodoEncontrado) {
       ejecutarDijkstraDesdeUbicacion(nodoEncontrado);
     } else {
-      const destinoTerm = encodeURIComponent(destino + ", Huancayo");
-      setUrlMapa(`https://maps.google.com/maps?saddr=${coordenadasActuales.lat},${coordenadasActuales.lng}&daddr=${destinoTerm}&z=14&output=embed`);
+      setUrlMapa(`https://maps.google.com/maps?q=${encodeURIComponent(destino + ", Huancayo")}&z=14&output=embed`);
       setCaminoCalculado(`Mi Ubicación → ${destino}`);
-      setTiempoEstimado("14 min");
-      setCostoRuta("4.2 Km");
       setRutaActiva(['Mi Ubicación', destino]);
     }
   };
 
   const handleCrearAlerta = async (tipo: string) => {
-    if (!usuario) {
-      alert("Debes iniciar sesión para reportar incidentes.");
-      return;
-    }
+    if (!usuario) return alert("Inicia sesión primero.");
     setCargandoAlerta(true);
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setCoordenadasActuales({ lat, lng });
-          await guardarAlerta(tipo, lat, lng);
-        },
-        async () => {
-          await guardarAlerta(tipo, coordenadasActuales.lat, coordenadasActuales.lng);
-        }
-      );
-    } else {
-      await guardarAlerta(tipo, coordenadasActuales.lat, coordenadasActuales.lng);
-    }
-  };
-
-  const guardarAlerta = async (tipo: string, lat: number, lng: number) => {
-    try {
-      const { error } = await supabase
-        .from('alertas_trafico')
-        .insert([{ tipo_reporte: tipo, latitud: lat, longitud: lng, estado: 'activo' }]);
-
-      if (error) throw error;
+    const guardar = async (l: number, g: number) => {
+      await supabase.from('alertas_trafico').insert([{ tipo_reporte: tipo, latitud: l, longitud: g, estado: 'activo' }]);
       alert(`¡Alerta de ${tipo} registrada!`);
-      await obtenerReportesEnVivo();
-    } catch (err) {
-      console.error(err);
-      alert("Error al registrar reporte.");
-    } finally {
+      obtenerReportesEnVivo();
       setCargandoAlerta(false);
-    }
+    };
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((p) => guardar(p.coords.latitude, p.coords.longitude), () => guardar(coordenadasActuales.lat, coordenadasActuales.lng));
+    } else { guardar(coordenadasActuales.lat, coordenadasActuales.lng); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between">
-      <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-50">
+    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans flex flex-col justify-between overflow-x-hidden relative">
+      
+      {/* CABECERA PRINCIPAL */}
+      <header className="bg-slate-900 border-b border-slate-800 p-4 flex justify-between items-center shadow-md relative z-40">
         <div className="flex items-center gap-4">
           <Link href="/" className="text-sm text-slate-400 hover:text-white transition">← MapFlash</Link>
           <h1 className="text-lg font-bold text-white">Mapa Nacional del Perú</h1>
         </div>
+        
         <div className="flex items-center gap-3">
           <span className="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full border border-emerald-500/20 font-medium">
             🔥 {reportes.length} Alertas activas
           </span>
           
           {usuario ? (
-            <div className="relative" ref={menuRef}>
-              {/* Botón del Perfil de Cabecera */}
-              <div 
-                onClick={() => setMenuAbierto(!menuAbierto)}
-                className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none"
-              >
-                <div className="w-6 h-6 rounded-full bg-slate-700 border border-blue-500 flex items-center justify-center overflow-hidden">
-                  {usuario.avatar_url ? (
-                    <img src={usuario.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
-                  )}
-                </div>
-                <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
-                <span className="text-[10px] text-slate-400 transition-transform duration-200 block" style={{ transform: menuAbierto ? 'rotate(180deg)' : 'rotate(0deg)' }}>▼</span>
-              </div>
-
-              {/* Tarjeta Desplegable de Perfil */}
-              {menuAbierto && (
-                <div className="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-2xl shadow-2xl p-4 flex flex-col gap-3 z-[100]">
-                  <div className="flex items-center gap-3 border-b border-slate-700/60 pb-3">
-                    <div className="w-10 h-10 rounded-full bg-slate-700 border border-blue-500 flex items-center justify-center overflow-hidden">
-                      {usuario.avatar_url ? (
-                        <img src={usuario.avatar_url} alt="Avatar Grande" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-sm font-bold text-blue-400">{usuario.nombre.charAt(0).toUpperCase()}</span>
-                      )}
-                    </div>
-                    <div className="overflow-hidden">
-                      <h4 className="text-sm font-bold text-white truncate">{usuario.nombre}</h4>
-                      <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded-md border border-blue-500/20 font-medium capitalize">{usuario.rol}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="text-xs flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">Correo Electrónico:</span>
-                    <span className="text-slate-200 font-mono bg-slate-900/50 px-2 py-1 rounded border border-slate-700/40 truncate">{usuario.email}</span>
-                  </div>
-
-                  <button 
-                    onClick={handleCerrarSesion}
-                    className="w-full mt-1 bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold py-2 rounded-xl transition flex items-center justify-center gap-1.5"
-                  >
-                    Cerrar Sesión Activa
-                  </button>
-                </div>
-              )}
-            </div>
+            <button 
+              onClick={() => setVerPerfilDetallado(true)}
+              className="flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3 py-1.5 rounded-xl cursor-pointer transition select-none z-50 text-left"
+            >
+              <img 
+                src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} 
+                alt="Avatar" 
+                className="w-6 h-6 rounded-full border border-blue-500 object-cover" 
+              />
+              <span className="text-xs font-semibold text-slate-200">{usuario.nombre}</span>
+              <span className="text-[10px] text-slate-500">⚙️</span>
+            </button>
           ) : (
             <Link href="/" className="text-xs bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-xl text-white font-medium transition">Iniciar Sesión</Link>
           )}
         </div>
       </header>
 
+      {/* MODAL / VENTANA LATERAL FLOTANTE DE PERFIL (CON CÁMARA / SUBIDA DE FOTO) */}
+      {verPerfilDetallado && usuario && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex justify-end animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-slate-900 h-full p-6 border-l border-slate-800 shadow-2xl flex flex-col justify-between animate-in slide-in-from-right duration-200">
+            <div>
+              <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
+                <h2 className="text-md font-bold text-white flex items-center gap-2">👤 Detalles del Perfil</h2>
+                <button onClick={() => setVerPerfilDetallado(false)} className="text-slate-400 hover:text-white font-bold text-sm bg-slate-800 p-2 rounded-xl transition">✕ Cerrar</button>
+              </div>
+
+              {/* CONTENEDOR DE FOTO INTERACTIVO */}
+              <div className="flex flex-col items-center gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800/80 mb-6">
+                <div className="relative group w-24 h-24 rounded-full border-2 border-blue-500 overflow-hidden shadow-xl bg-slate-800">
+                  <img 
+                    src={usuario.avatar_url || "https://api.dicebear.com/7.x/bottts/svg?seed=Joaquien"} 
+                    alt="Foto Grande" 
+                    className="w-full h-full object-cover" 
+                  />
+                  <div 
+                    onClick={() => archivoInputRef.current?.click()}
+                    className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                  >
+                    <span className="text-[18px]">📷</span>
+                    <span className="text-[10px] text-slate-300 font-semibold uppercase text-center px-1">Subir / Tomar</span>
+                  </div>
+                </div>
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  capture="user" // Habilita la cámara frontal directamente en celulares
+                  ref={archivoInputRef} 
+                  onChange={handleCambiarFoto} 
+                  className="hidden" 
+                />
+                <button 
+                  onClick={() => archivoInputRef.current?.click()}
+                  className="text-xs bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 px-4 py-1.5 rounded-xl font-semibold transition"
+                >
+                  Cambiar Foto o Usar Cámara
+                </button>
+              </div>
+
+              {/* CAMPOS DEL FORMULARIO DEL USUARIO */}
+              <div className="flex flex-col gap-4 text-xs">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Nombre de Usuario:</label>
+                  <input type="text" readOnly value={usuario.nombre} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none font-medium" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Correo Electrónico:</label>
+                  <input type="text" readOnly value={usuario.email} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 outline-none font-mono" />
+                </div>
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Rol Asignado:</label>
+                  <input type="text" readOnly value={usuario.rol} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-emerald-400 font-semibold uppercase tracking-wider" />
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleCerrarSesion}
+              className="w-full bg-rose-500/10 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/20 text-xs font-semibold py-3 rounded-xl transition"
+            >
+              Cerrar Sesión Completa
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* CUERPO PRINCIPAL DEL MAPA */}
       <main className="flex-1 bg-slate-950 p-4 flex flex-col gap-4 relative z-10">
-        {/* BUSCADOR */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl">
           <form onSubmit={handleBuscarDestinoUnificado} className="flex gap-2">
-            <input 
-              type="text" 
-              placeholder="Introduce tu destino (ej. Universidad Continental / Real Plaza / Nodo_D)..." 
-              value={destino}
-              onChange={(e) => setDestino(e.target.value)}
-              className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500"
-            />
-            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition active:scale-95">
-              Buscar y Calcular Ruta con Dijkstra →
-            </button>
+            <input type="text" placeholder="Introduce tu destino (ej. Universidad Continental / Real Plaza / Nodo_D)..." value={destino} onChange={(e) => setDestino(e.target.value)} className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500" />
+            <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-sm font-semibold px-6 py-3 rounded-xl text-white transition active:scale-95">Buscar y Calcular Ruta con Dijkstra →</button>
           </form>
         </div>
 
-        {/* Métricas */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
-            <span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span>
-            <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
-          </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
-            <span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO EN RUTA</span>
-            <span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span>
-          </div>
-          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60">
-            <span className="block text-[10px] font-bold text-slate-500 uppercase">COSTO DE LLEGADA</span>
-            <span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span>
-          </div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">MÉTRICA DE RUTA</span><span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">TIEMPO EN RUTA</span><span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱️ {tiempoEstimado}</span></div>
+          <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/60"><span className="block text-[10px] font-bold text-slate-500 uppercase">COSTO DE LLEGADA</span><span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span></div>
         </div>
 
-        {/* GPS */}
         <div className="flex items-center justify-between bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
-          <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Visor GPS Activo
-          </span>
-          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">
-            📍 Localizar mi Posición
-          </button>
+          <span className="text-xs text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2"><span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" /> Visor GPS Activo</span>
+          <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition active:scale-95">📍 Localizar mi Posición</button>
         </div>
 
-        {/* Mapa */}
-        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[480px] z-20">
-          <iframe
-            src={urlMapa}
-            className="w-full h-full border-0 absolute inset-0 z-20"
-            allowFullScreen={true}
-            loading="lazy"
-          ></iframe>
-
-          {/* Alternativas de ruta flotantes */}
+        <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[440px] z-20">
+          <iframe src={urlMapa} className="w-full h-full border-0 absolute inset-0 z-20" allowFullScreen={true} loading="lazy"></iframe>
           {rutaActiva.length > 0 && (
             <div className="absolute bottom-4 right-4 bg-slate-900/95 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-2xl max-w-xs z-30">
-              <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Alternativas de Ruta Generadas</h3>
+              <h3 className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2">Alternativas Generadas</h3>
               <div className="flex flex-col gap-2 text-[11px]">
-                <div className="bg-slate-950 p-2 rounded border border-emerald-500/30">
-                  <span className="text-emerald-400 font-bold">🟢 Ruta Óptima (Dijkstra):</span>
-                  <p className="text-slate-300 font-mono mt-0.5">{rutaActiva.join(' → ')}</p>
-                </div>
-                <div className="bg-slate-950/50 p-2 rounded border border-slate-800 text-slate-400">
-                  <span className="text-blue-400 font-bold">🔵 Alternativa 2:</span> Evitando Av. Ferrocarril (+4 min)
-                </div>
-                <div className="bg-slate-950/50 p-2 rounded border border-slate-800 text-slate-400">
-                  <span className="text-amber-400 font-bold">🟡 Alternativa 3:</span> Por San Carlos (+9 min)
-                </div>
+                <div className="bg-slate-950 p-2 rounded border border-emerald-500/30"><span className="text-emerald-400 font-bold">🟢 Ruta Óptima (Dijkstra):</span><p className="text-slate-300 font-mono mt-0.5">{rutaActiva.join(' → ')}</p></div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Incidentes */}
         <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-xl flex flex-col gap-3">
           <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">ALERTAR INCIDENTES DE TRÁNSITO</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
