@@ -73,7 +73,7 @@ export default function MapaPage() {
           setCentroMapa({
             lat: position.coords.latitude,
             lng: position.coords.longitude,
-            zoom: 15 // Zoom ideal para ver calles de la ciudad actual
+            zoom: 15
           });
         },
         () => {
@@ -92,7 +92,6 @@ export default function MapaPage() {
     }
     setCargandoAlerta(true);
     
-    // Si el GPS falla, toma la coordenada actual del centro del mapa
     let lat = centroMapa.lat;
     let lng = centroMapa.lng;
 
@@ -251,9 +250,9 @@ export default function MapaPage() {
         {/* Contenedor del Mapa Físico */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           
-          {/* 🗺️ VARIABLE CORREGIDA PERFECTAMENTE SIN TEXTO EXTRA */}
+          {/* ✅ URL CORREGIDA NATIVA DE GOOGLE MAPS EMBED */}
           <iframe
-            src={`http://googleusercontent.com/maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
+            src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
             className="w-full h-full border-0 absolute inset-0"
             allowFullScreen={true}
             loading="lazy"
