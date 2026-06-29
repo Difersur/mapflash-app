@@ -22,10 +22,16 @@ interface AlertaTrafico {
   estado: string;
 }
 
+interface ConexionNodo {
+  idDestino: string;
+  distanciaKm: number;  
+  tiempoMin: number;    
+}
+
 interface NodoGrafo {
   lat: number;
   lng: number;
-  conexiones: Record<string, number>;
+  conexiones: ConexionNodo[]; 
 }
 
 export default function MapaPage() {
@@ -34,21 +40,42 @@ export default function MapaPage() {
   const [cargandoAlerta, setCargandoAlerta] = useState(false);
   const [destino, setDestino] = useState('');
   
-  // Tu visor del camino calculado original intacto
-  const [caminoCalculado, setCaminoCalculado] = useState<string>('Camino: Nodo_A → Nodo_B → Nodo_D');
+  // SE QUITARON LOS NÚMEROS PREDESTINADOS DE LOS ESTADOS INICIALES
+  const [caminoCalculado, setCaminoCalculado] = useState<string>('Esperando origen y destino...');
+  const [tiempoEstimado, setTiempoEstimado] = useState<string>('-- min');
+  const [costoRuta, setCostoRuta] = useState<string>('-- Km');
 
-  // Tus coordenadas originales de Huancayo (-12.05, -75.23)
+  // Tus coordenadas de Huancayo originales base
   const [centroMapa, setCentroMapa] = useState({
     lat: -12.05, 
     lng: -75.23,
     zoom: 13 
   });
 
-  // Tu base de datos original de nodos
+  // Tu base de datos de nodos original
   const [NODOS_MAPA, setNodosMapa] = useState<Record<string, NodoGrafo>>({
-    "Nodo_A": { lat: -12.05, lng: -75.23, conexiones: { "Nodo_B": 5 } },
-    "Nodo_B": { lat: -12.06, lng: -75.21, conexiones: { "Nodo_A": 5, "Nodo_D": 3 } },
-    "Nodo_D": { lat: -12.07, lng: -75.22, conexiones: { "Nodo_B": 3 } }
+    "Nodo_A": { 
+      lat: -12.05, 
+      lng: -75.23, 
+      conexiones: [
+        { idDestino: "Nodo_B", distanciaKm: 5, tiempoMin: 7 }
+      ] 
+    },
+    "Nodo_B": { 
+      lat: -12.06, 
+      lng: -75.21, 
+      conexiones: [
+        { idDestino: "Nodo_A", distanciaKm: 5, tiempoMin: 7 },
+        { idDestino: "Nodo_D", distanciaKm: 3.5, tiempoMin: 5 }
+      ] 
+    },
+    "Nodo_D": { 
+      lat: -12.07, 
+      lng: -75.22, 
+      conexiones: [
+        { idDestino: "Nodo_B", distanciaKm: 3.5, tiempoMin: 5 }
+      ] 
+    }
   });
 
   useEffect(() => {
@@ -98,7 +125,7 @@ export default function MapaPage() {
     }
   };
 
-  // Tu algoritmo original de Dijkstra (Corregido el tipo implícito 'any' de nodoActual para Vercel)
+  // Tu algoritmo de Dijkstra con tipado explícito para compilar limpio en Vercel
   const ejecutarDijkstra = (inicio: string, fin: string) => {
     if (!NODOS_MAPA[inicio] || !NODOS_MAPA[fin]) {
       alert("Nodos de origen o destino no válidos.");
@@ -106,14 +133,17 @@ export default function MapaPage() {
     }
 
     const distancias: Record<string, number> = {};
+    const tiempos: Record<string, number> = {};
     const previos: Record<string, string | null> = {};
     const visitados = new Set<string>();
 
     Object.keys(NODOS_MAPA).forEach(nodo => {
       distancias[nodo] = Infinity;
+      tiempos[nodo] = Infinity;
       previos[nodo] = null;
     });
     distancias[inicio] = 0;
+    tiempos[inicio] = 0;
 
     while (visitados.size < Object.keys(NODOS_MAPA).length) {
       let nodoActual: string | null = null; 
@@ -129,11 +159,15 @@ export default function MapaPage() {
       if (nodoActual === null || nodoActual === fin) break;
       visitados.add(nodoActual);
 
-      const conexiones = NODOS_MAPA[nodoActual as string].conexiones || {};
-      Object.keys(conexiones).forEach(vecino => {
-        const alt = distancias[nodoActual as string] + conexiones[vecino];
-        if (alt < distancias[vecino]) {
-          distancias[vecino] = alt;
+      const conexiones = NODOS_MAPA[nodoActual as string].conexiones || [];
+      conexiones.forEach(conexion => {
+        const vecino = conexion.idDestino;
+        const altDistancia = distancias[nodoActual as string] + conexion.distanciaKm;
+        const altTiempo = tiempos[nodoActual as string] + conexion.tiempoMin;
+
+        if (altDistancia < distancias[vecino]) {
+          distancias[vecino] = altDistancia;
+          tiempos[vecino] = altTiempo;
           previos[vecino] = nodoActual;
         }
       });
@@ -146,7 +180,10 @@ export default function MapaPage() {
       paso = previos[paso];
     }
 
+    // Los datos numéricos reales solo se inyectan tras el cálculo explícito
     setCaminoCalculado(`Camino: ${camino.join(' → ')}`);
+    setTiempoEstimado(`Tiempo estimado: ${tiempos[fin]} min`);
+    setCostoRuta(`Costo total: ${distancias[fin]} Km`);
     
     setCentroMapa({
       lat: NODOS_MAPA[fin].lat,
@@ -298,30 +335,36 @@ export default function MapaPage() {
           </button>
         </div>
 
-        {/* Fila de Estado de Ubicación y Autómata */}
+        {/* Panel de Datos Métricos Limpios (Sin números predeterminados en pantalla) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-2xl">
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+            <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">MÉTRICA DE RUTA</span>
+            <span className="text-xs text-slate-200 font-mono block mt-1">{caminoCalculado}</span>
+          </div>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+            <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">TIEMPO EN RUTA</span>
+            <span className="text-xs text-amber-400 font-mono block mt-1 font-bold">⏱ {tiempoEstimado}</span>
+          </div>
+          <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60">
+            <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">COSTO DE LLEGADA</span>
+            <span className="text-xs text-blue-400 font-mono block mt-1 font-bold">📏 {costoRuta}</span>
+          </div>
+        </div>
+
+        {/* Fila de Estado de Ubicación */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-800/60">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs bg-slate-800 border border-slate-700 text-emerald-400 px-3 py-1.5 rounded-xl font-medium flex items-center gap-2">
               <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              Ubicación GPS ({centroMapa.lat.toFixed(2)}, {centroMapa.lng.toFixed(2)})
+              Ubicación GPS Activa
             </span>
             <button onClick={localizarMiPosicion} className="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-blue-500 text-slate-200 px-3 py-1.5 rounded-xl font-semibold transition flex items-center gap-1 active:scale-95">
               📍 Localizar mi Posición
             </button>
           </div>
-
-          <div className="bg-slate-950/80 border border-slate-800 p-2 rounded-xl text-right flex items-center justify-between sm:justify-end gap-4">
-            <div className="text-left sm:text-right">
-              <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">AUTOMÁTA DIJKSTRA</span>
-              <span className="text-xs text-slate-300 font-mono">{caminoCalculado}</span>
-            </div>
-            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] uppercase tracking-widest font-extrabold px-2 py-0.5 rounded-md">
-              EN VIVO
-            </span>
-          </div>
         </div>
 
-        {/* Iframe del Mapa Físico (Corregido con la URL nativa sin caracteres extra) */}
+        {/* Iframe del Mapa Físico */}
         <div className="w-full flex-1 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl relative bg-slate-900 min-h-[350px]">
           <iframe
             src={`https://maps.google.com/maps?q=${centroMapa.lat},${centroMapa.lng}&z=${centroMapa.zoom}&output=embed`}
@@ -334,22 +377,6 @@ export default function MapaPage() {
           <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-md px-3 py-2 rounded-xl border border-slate-700 shadow-lg flex items-center gap-2 z-10">
             <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
             <span className="text-xs font-semibold text-slate-200">Sistema GPS Activo · Perú</span>
-          </div>
-
-          <div className="absolute top-4 right-4 bg-slate-900/90 backdrop-blur-md p-4 rounded-xl border border-slate-700 shadow-lg w-64 z-10 hidden md:block">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Reportes en tu zona</h3>
-            <div className="max-h-48 overflow-y-auto flex flex-col gap-2">
-              {reportes.length === 0 ? (
-                <p className="text-xs text-slate-400 italic">Todo despejado por ahora 👍</p>
-              ) : (
-                reportes.map((r) => (
-                  <div key={r.id} onClick={() => irAUbicacion(r.latitud, r.longitud)} className="text-xs bg-slate-800 hover:bg-slate-700 p-2 rounded-lg border border-slate-700 flex justify-between items-center cursor-pointer transition active:scale-95">
-                    <span className="capitalize text-slate-200 font-medium">⚠️ {r.tipo_reporte}</span>
-                    <span className="text-[10px] text-amber-400 font-bold bg-amber-500/10 px-1.5 py-0.5 rounded">Ver</span>
-                  </div>
-                ))
-              )}
-            </div>
           </div>
         </div>
 
